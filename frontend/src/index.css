@@ -1,0 +1,117 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f8fa;
+  color: #172b3a;
+}
+
+button {
+  font: inherit;
+}
+
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+header {
+  margin-bottom: 40px;
+}
+
+header h1 {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+header p {
+  color: #64748b;
+}
+
+h2 {
+  margin-bottom: 20px;
+}
+
+.spot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+.spot-card {
+  background: white;
+  padding: 24px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.spot-card:hover {
+  border-color: #0c7899;
+}
+
+.spot-card.selected {
+  border-color: #0c7899;
+  background: #eaf6fa;
+}
+
+.spot-card h3 {
+  margin-top: 0;
+}
+
+.spot-card p {
+  color: #64748b;
+}
+
+.spot-card span {
+  color: #087695;
+  font-weight: 600;
+}
+
+.forecast-section {
+  margin-top: 40px;
+}
+
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.forecast-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.forecast-card h3 {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.forecast-card p {
+  font-size: 14px;
+  color: #475569;
+}
+
+.forecast-card strong {
+  color: #172b3a;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+@media (max-width: 600px) {
+  .dashboard {
+    padding: 24px 16px;
+  }
+}
