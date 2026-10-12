@@ -75,3 +75,25 @@ def test_boundary_values():
     matches = find_matching_hours(forecast, alert)
 
     assert len(matches) == 2
+
+
+from datetime import date
+
+from app.services.notifications import group_matches_by_day
+
+
+def test_group_matches_by_california_date():
+    forecast = [
+        {"time": "2026-10-13T06:00"},
+        {"time": "2026-10-13T08:00"}
+    ]
+
+    grouped = group_matches_by_day(forecast)
+
+    assert len(grouped) == 2
+
+    # 06:00 UTC is 11 PM the previous day in California
+    assert grouped[0][0] == date(2026, 10, 12)
+
+    # 08:00 UTC is 1 AM on October 13 in California
+    assert grouped[1][0] == date(2026, 10, 13)

@@ -4,9 +4,20 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 from sqlalchemy import Boolean, ForeignKey, CheckConstraint
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, UniqueConstraint, func
+from sqlalchemy import (
+    Integer,
+    String,
+    Float,
+    Boolean,
+    ForeignKey,
+    Date,
+    DateTime,
+    UniqueConstraint,
+    CheckConstraint,
+    func,
+)
 
 
 class SurfSpot(Base):
@@ -106,4 +117,58 @@ class AlertMatch(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False
+    )
+
+
+class NotificationDelivery(Base):
+    __tablename__ = "notification_deliveries"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "alert_id",
+            "surf_date",
+            name="uq_notification_alert_date"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True
+    )
+
+    alert_id: Mapped[int] = mapped_column(
+        ForeignKey("alerts.id"),
+        nullable=False
+    )
+
+    surf_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False
+    )
+
+    recipient: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="pending"
+    )
+
+    provider_message_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
     )
