@@ -22,10 +22,11 @@ from app.services.forecast import (
     get_forecast,
 )
 from app.services.matching import find_matching_hours
+from app.auth import router as auth_router
 
 
 app = FastAPI(title="Surf Alerts API")
-
+app.include_router(auth_router)
 
 # -------- HOME / HEALTH --------
 

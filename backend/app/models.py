@@ -17,33 +17,73 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
+# -------- USERS --------
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+
+# -------- SURF SPOTS --------
+
 class SurfSpot(Base):
     __tablename__ = "surf_spots"
 
     id: Mapped[int] = mapped_column(
-        Integer, primary_key=True
+        Integer,
+        primary_key=True
     )
 
     slug: Mapped[str] = mapped_column(
-        String(100), unique=True, nullable=False
+        String(100),
+        unique=True,
+        nullable=False
     )
 
     name: Mapped[str] = mapped_column(
-        String(100), nullable=False
+        String(100),
+        nullable=False
     )
 
     latitude: Mapped[float] = mapped_column(
-        Float, nullable=False
+        Float,
+        nullable=False
     )
 
     longitude: Mapped[float] = mapped_column(
-        Float, nullable=False
+        Float,
+        nullable=False
     )
 
     region: Mapped[str] = mapped_column(
-        String(100), nullable=False
+        String(100),
+        nullable=False
     )
 
+
+# -------- ALERTS --------
 
 class Alert(Base):
     __tablename__ = "alerts"
@@ -51,16 +91,18 @@ class Alert(Base):
     __table_args__ = (
         CheckConstraint(
             "min_wave_height_ft <= max_wave_height_ft",
-            name="valid_wave_height_range",
+            name="valid_wave_height_range"
         ),
     )
 
     id: Mapped[int] = mapped_column(
-        Integer, primary_key=True
+        Integer,
+        primary_key=True
     )
 
     name: Mapped[str] = mapped_column(
-        String(100), nullable=False
+        String(100),
+        nullable=False
     )
 
     spot_id: Mapped[int] = mapped_column(
@@ -69,15 +111,18 @@ class Alert(Base):
     )
 
     min_wave_height_ft: Mapped[float] = mapped_column(
-        Float, nullable=False
+        Float,
+        nullable=False
     )
 
     max_wave_height_ft: Mapped[float] = mapped_column(
-        Float, nullable=False
+        Float,
+        nullable=False
     )
 
     min_swell_period_s: Mapped[float] = mapped_column(
-        Float, nullable=False
+        Float,
+        nullable=False
     )
 
     max_wind_speed_kn: Mapped[float | None] = mapped_column(
@@ -87,9 +132,13 @@ class Alert(Base):
     )
 
     is_active: Mapped[bool] = mapped_column(
-        Boolean, default=True, nullable=False
+        Boolean,
+        default=True,
+        nullable=False
     )
 
+
+# -------- MATCHED FORECAST HOURS --------
 
 class AlertMatch(Base):
     __tablename__ = "alert_matches"
@@ -98,7 +147,7 @@ class AlertMatch(Base):
         UniqueConstraint(
             "alert_id",
             "forecast_time",
-            name="uq_alert_matches_alert_time",
+            name="uq_alert_matches_alert_time"
         ),
     )
 
@@ -124,6 +173,8 @@ class AlertMatch(Base):
     )
 
 
+# -------- NOTIFICATION DELIVERIES --------
+
 class NotificationDelivery(Base):
     __tablename__ = "notification_deliveries"
 
@@ -131,7 +182,7 @@ class NotificationDelivery(Base):
         UniqueConstraint(
             "alert_id",
             "surf_date",
-            name="uq_notification_alert_date",
+            name="uq_notification_alert_date"
         ),
     )
 
