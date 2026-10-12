@@ -15,6 +15,9 @@ from app.services.matching import find_matching_hours
 
 from app.schemas import AlertStatusUpdate
 
+from sqlalchemy import delete
+from app.models import AlertMatch, NotificationDelivery
+
 
 app = FastAPI(title="Surf Alerts API")
 
@@ -244,3 +247,80 @@ def update_alert_status(
 
     return alert
 
+
+
+# -------- UPDATE AN ALERT --------
+
+@app.put(
+    "/alerts/{alert_id}",
+    response_model=AlertResponse
+)
+def edit_alert(
+    alert_id: int,
+    update: AlertCreate,
+    db: Session = Depends(get_db)
+):
+    # Find the existing alert
+    alert = db.get(Alert, alert_id)
+
+    if alert is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Alert not found"
+        )
+
+    # Verify the new surf spot exists
+    spot = db.get(SurfSpot, update.spot_id)
+
+    if spot is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Surf spot not found"
+        )
+
+    # Update its fields
+    for field, value in update.model_dump().items():
+        setattr(alert, field, value)
+
+    db.commit()
+    db.refresh(alert)
+
+    return alert
+
+
+# -------- DELETE AN ALERT --------
+
+@app.delete(
+    "/alerts/{alert_id}",
+    status_code=204
+)
+def delete_alert(
+    alert_id: int,
+    db: Session = Depends(get_db)
+):
+    alert = db.get(Alert, alert_id)
+
+    if alert is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Alert not found"
+        )
+
+    # Remove saved match records first
+    db.execute(
+        delete(AlertMatch).where(
+            AlertMatch.alert_id == alert_id
+        )
+    )
+
+    # Remove notification delivery history
+    db.execute(
+        delete(NotificationDelivery).where(
+            NotificationDelivery.alert_id == alert_id
+        )
+    )
+
+    # Finally remove the alert itself
+    db.delete(alert)
+
+    db.commit()

@@ -322,3 +322,82 @@ h2 {
     font-size: 30px;
   }
 }
+
+
+/* -------- EDIT ALERT FORM -------- */
+
+.edit-form {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.edit-form .form-group {
+  margin-bottom: 16px;
+}
+
+/* -------- ALERT ACTION BUTTONS -------- */
+
+.alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.alert-actions button {
+  margin-top: 0;
+}
+
+.delete-button {
+  background: #fff;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.delete-button:hover {
+  background: #fef2f2;
+}
+
+.delete-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* -------- DELETE CONFIRMATION -------- */
+
+.delete-confirmation {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+}
+
+.delete-confirmation p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #991b1b;
+}
+
+.delete-confirmation .alert-actions {
+  margin-top: 16px;
+}
+
+/* -------- MOBILE -------- */
+
+@media (max-width: 600px) {
+  .alert-actions {
+    gap: 8px;
+  }
+
+  .alert-actions button {
+    flex: 1;
+  }
+}

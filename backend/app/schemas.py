@@ -1,5 +1,8 @@
-from pydantic import BaseModel, Field, ConfigDict
 
+from pydantic import BaseModel, Field, ConfigDict, model_validator
+
+
+# -------- SURF SPOT SCHEMAS --------
 
 class SurfSpotCreate(BaseModel):
     slug: str = Field(
@@ -19,8 +22,8 @@ class SurfSpotResponse(SurfSpotCreate):
 
     model_config = ConfigDict(from_attributes=True)
 
-from pydantic import model_validator
 
+# -------- ALERT SCHEMAS --------
 
 class AlertCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -45,6 +48,7 @@ class AlertResponse(AlertCreate):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class AlertStatusUpdate(BaseModel):
     is_active: bool
