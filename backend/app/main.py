@@ -11,6 +11,8 @@ from app.schemas import SurfSpotCreate, SurfSpotResponse
 from app.models import Alert
 from app.schemas import AlertCreate, AlertResponse
 
+from app.services.matching import find_matching_hours
+
 
 app = FastAPI(title="Surf Alerts API")
 
@@ -168,3 +170,51 @@ def list_alerts(
     ).all()
 
     return alerts
+
+
+@app.get("/alerts/{alert_id}/matches")
+async def get_alert_matches(
+    alert_id: int,
+    db: Session = Depends(get_db)
+):
+    # Retrieve the alert from PostgreSQL
+    alert = db.get(Alert, alert_id)
+
+    if alert is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Alert not found"
+        )
+
+    # Retrieve its associated surf spot
+    spot = db.get(SurfSpot, alert.spot_id)
+
+    if spot is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Surf spot not found"
+        )
+
+    # Fetch the latest marine forecast
+    raw_data = await get_forecast(
+        spot.latitude,
+        spot.longitude
+    )
+
+    # Convert the forecast into our standard format
+    formatted_data = format_forecast(raw_data)
+
+    # Find hours matching the user's preferences
+    matches = find_matching_hours(
+        formatted_data,
+        alert
+    )
+
+    return {
+        "alert_id": alert.id,
+        "alert_name": alert.name,
+        "spot": spot.name,
+        "total_matches": len(matches),
+        "matching_hours": matches
+    }
+
