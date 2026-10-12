@@ -13,6 +13,8 @@ from app.schemas import AlertCreate, AlertResponse
 
 from app.services.matching import find_matching_hours
 
+from app.schemas import AlertStatusUpdate
+
 
 app = FastAPI(title="Surf Alerts API")
 
@@ -217,4 +219,28 @@ async def get_alert_matches(
         "total_matches": len(matches),
         "matching_hours": matches
     }
+
+@app.patch(
+    "/alerts/{alert_id}",
+    response_model=AlertResponse
+)
+def update_alert_status(
+    alert_id: int,
+    update: AlertStatusUpdate,
+    db: Session = Depends(get_db)
+):
+    alert = db.get(Alert, alert_id)
+
+    if alert is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Alert not found"
+        )
+
+    alert.is_active = update.is_active
+
+    db.commit()
+    db.refresh(alert)
+
+    return alert
 

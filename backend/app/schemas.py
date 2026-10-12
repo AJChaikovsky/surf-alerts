@@ -45,3 +45,6 @@ class AlertResponse(AlertCreate):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+class AlertStatusUpdate(BaseModel):
+    is_active: bool

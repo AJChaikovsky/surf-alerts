@@ -1,4 +1,6 @@
 
+/* General page styling */
+
 * {
   box-sizing: border-box;
 }
@@ -20,6 +22,8 @@ button {
   padding: 40px 24px;
 }
 
+/* Header */
+
 header {
   margin-bottom: 40px;
 }
@@ -36,6 +40,8 @@ header p {
 h2 {
   margin-bottom: 20px;
 }
+
+/* Surf spot cards */
 
 .spot-grid {
   display: grid;
@@ -75,8 +81,15 @@ h2 {
   font-weight: 600;
 }
 
+/* Forecast section */
+
 .forecast-section {
   margin-top: 40px;
+}
+
+.forecast-note {
+  color: #64748b;
+  font-size: 13px;
 }
 
 .forecast-grid {
@@ -106,12 +119,206 @@ h2 {
   color: #172b3a;
 }
 
+/* Alert sections */
+
+.alert-section {
+  margin-top: 48px;
+}
+
+/* Create Alert form */
+
+.alert-form {
+  background: white;
+  padding: 28px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  max-width: 650px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+  color: #172b3a;
+  font-size: 15px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: 2px solid #0c7899;
+  outline-offset: 1px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Buttons */
+
+.primary-button {
+  background: #087695;
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button:hover {
+  background: #075d76;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  margin-top: 12px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  background: #f1f5f9;
+}
+
+/* Saved alerts */
+
+.saved-alerts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.saved-alert-card {
+  background: white;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.alert-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.alert-heading h3 {
+  margin: 0 0 6px;
+}
+
+.alert-heading p {
+  margin: 0;
+  color: #64748b;
+}
+
+/* NEW: Active / Paused status circles */
+
+.alert-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Green circle for active alerts */
+
+.status-dot.active {
+  background-color: #22c55e;
+}
+
+/* Orange circle for paused alerts */
+
+.status-dot.paused {
+  background-color: #f59e0b;
+}
+
+/* NEW: Inline form notifications */
+
+.form-notification {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.form-notification-error {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.form-notification-success {
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+/* General dashboard error messages */
+
 .error {
   color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 12px;
+  border-radius: 8px;
 }
+
+/* Mobile responsiveness */
 
 @media (max-width: 600px) {
   .dashboard {
     padding: 24px 16px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .alert-form {
+    padding: 20px;
+  }
+
+  header h1 {
+    font-size: 30px;
   }
 }
