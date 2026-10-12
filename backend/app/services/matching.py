@@ -1,4 +1,3 @@
-
 def find_matching_hours(forecast: list[dict], alert):
     """
     Return forecast hours that satisfy an alert's conditions.

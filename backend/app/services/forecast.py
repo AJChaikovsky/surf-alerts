@@ -3,13 +3,17 @@ import httpx
 MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 
 
-async def get_forecast(latitude: float, longitude: float):
+async def get_forecast(
+    latitude: float,
+    longitude: float,
+    timezone: str = "America/Los_Angeles"
+):
     params = {
         "latitude": latitude,
         "longitude": longitude,
         "hourly": "wave_height,wave_period,swell_wave_height,swell_wave_period",
         "forecast_days": 3,
-        "timezone": "America/Los_Angeles"
+        "timezone": timezone
     }
 
     async with httpx.AsyncClient(timeout=15) as client:

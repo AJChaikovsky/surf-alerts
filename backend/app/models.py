@@ -4,6 +4,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 from sqlalchemy import Boolean, ForeignKey, CheckConstraint
 
+from datetime import datetime
+
+from sqlalchemy import DateTime, UniqueConstraint, func
+
 
 class SurfSpot(Base):
     __tablename__ = "surf_spots"
@@ -69,4 +73,37 @@ class Alert(Base):
 
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False
+    )
+
+
+class AlertMatch(Base):
+    __tablename__ = "alert_matches"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "alert_id",
+            "forecast_time",
+            name="uq_alert_matches_alert_time"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True
+    )
+
+    alert_id: Mapped[int] = mapped_column(
+        ForeignKey("alerts.id"),
+        nullable=False
+    )
+
+    forecast_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False
+    )
+
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
     )

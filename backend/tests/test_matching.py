@@ -1,4 +1,3 @@
-
 from types import SimpleNamespace
 
 from app.services.matching import find_matching_hours
