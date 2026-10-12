@@ -1,8 +1,10 @@
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    model_validator,
+)
 
-from pydantic import BaseModel, Field, ConfigDict, model_validator
-
-
-# -------- SURF SPOT SCHEMAS --------
 
 class SurfSpotCreate(BaseModel):
     slug: str = Field(
@@ -23,8 +25,6 @@ class SurfSpotResponse(SurfSpotCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
-# -------- ALERT SCHEMAS --------
-
 class AlertCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     spot_id: int = Field(gt=0)
@@ -33,14 +33,20 @@ class AlertCreate(BaseModel):
     max_wave_height_ft: float = Field(ge=0)
     min_swell_period_s: float = Field(gt=0)
 
+    max_wind_speed_kn: float | None = Field(
+        default=None,
+        ge=0
+    )
+
     is_active: bool = True
 
     @model_validator(mode="after")
     def validate_wave_range(self):
         if self.min_wave_height_ft > self.max_wave_height_ft:
             raise ValueError(
-                "Minimum wave height cannot exceed maximum"
+                "Minimum wave height cannot exceed maximum wave height"
             )
+
         return self
 
 

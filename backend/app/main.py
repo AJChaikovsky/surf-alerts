@@ -1,26 +1,33 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import SurfSpot
-from app.services.forecast import get_forecast, format_forecast
-from sqlalchemy.exc import IntegrityError
-from app.schemas import SurfSpotCreate, SurfSpotResponse
-
-from app.models import Alert
-from app.schemas import AlertCreate, AlertResponse
-
+from app.models import (
+    Alert,
+    AlertMatch,
+    NotificationDelivery,
+    SurfSpot,
+)
+from app.schemas import (
+    AlertCreate,
+    AlertResponse,
+    AlertStatusUpdate,
+    SurfSpotCreate,
+    SurfSpotResponse,
+)
+from app.services.forecast import (
+    format_forecast,
+    get_forecast,
+)
 from app.services.matching import find_matching_hours
-
-from app.schemas import AlertStatusUpdate
-
-from sqlalchemy import delete
-from app.models import AlertMatch, NotificationDelivery
 
 
 app = FastAPI(title="Surf Alerts API")
 
+
+# -------- HOME / HEALTH --------
 
 @app.get("/")
 def home():
@@ -32,13 +39,18 @@ def health():
     return {"status": "healthy"}
 
 
+# -------- FORECAST ENDPOINTS --------
+
 @app.get("/forecast")
 async def forecast(latitude: float, longitude: float):
     return await get_forecast(latitude, longitude)
 
 
 @app.get("/forecast/summary")
-async def forecast_summary(latitude: float, longitude: float):
+async def forecast_summary(
+    latitude: float,
+    longitude: float
+):
     raw_data = await get_forecast(latitude, longitude)
 
     return {
@@ -50,21 +62,16 @@ async def forecast_summary(latitude: float, longitude: float):
     }
 
 
-@app.get("/spots")
-def list_spots(db: Session = Depends(get_db)):
-    spots = db.scalars(select(SurfSpot)).all()
+# -------- SURF SPOTS --------
 
-    return [
-        {
-            "id": spot.id,
-            "slug": spot.slug,
-            "name": spot.name,
-            "latitude": spot.latitude,
-            "longitude": spot.longitude,
-            "region": spot.region
-        }
-        for spot in spots
-    ]
+@app.get(
+    "/spots",
+    response_model=list[SurfSpotResponse]
+)
+def list_spots(db: Session = Depends(get_db)):
+    return db.scalars(
+        select(SurfSpot).order_by(SurfSpot.id)
+    ).all()
 
 
 @app.get("/spots/{spot_id}/forecast")
@@ -73,7 +80,9 @@ async def spot_forecast(
     db: Session = Depends(get_db)
 ):
     spot = db.scalar(
-        select(SurfSpot).where(SurfSpot.slug == spot_id)
+        select(SurfSpot).where(
+            SurfSpot.slug == spot_id
+        )
     )
 
     if spot is None:
@@ -103,23 +112,20 @@ def create_spot(
     spot: SurfSpotCreate,
     db: Session = Depends(get_db)
 ):
-    # Check whether the spot already exists
-    existing_spot = db.scalar(
+    existing = db.scalar(
         select(SurfSpot).where(
             SurfSpot.slug == spot.slug
         )
     )
 
-    if existing_spot:
+    if existing is not None:
         raise HTTPException(
             status_code=409,
             detail="Surf spot already exists"
         )
 
-    # Create a new database model
     new_spot = SurfSpot(**spot.model_dump())
 
-    # Save to PostgreSQL
     try:
         db.add(new_spot)
         db.commit()
@@ -134,6 +140,8 @@ def create_spot(
     return new_spot
 
 
+# -------- CREATE ALERT --------
+
 @app.post(
     "/alerts",
     response_model=AlertResponse,
@@ -143,7 +151,6 @@ def create_alert(
     alert: AlertCreate,
     db: Session = Depends(get_db)
 ):
-    # Verify the surf spot exists
     spot = db.get(SurfSpot, alert.spot_id)
 
     if spot is None:
@@ -152,10 +159,8 @@ def create_alert(
             detail="Surf spot not found"
         )
 
-    # Create a new alert
     new_alert = Alert(**alert.model_dump())
 
-    # Store it in PostgreSQL
     db.add(new_alert)
     db.commit()
     db.refresh(new_alert)
@@ -163,26 +168,25 @@ def create_alert(
     return new_alert
 
 
+# -------- LIST ALERTS --------
+
 @app.get(
     "/alerts",
     response_model=list[AlertResponse]
 )
-def list_alerts(
-    db: Session = Depends(get_db)
-):
-    alerts = db.scalars(
+def list_alerts(db: Session = Depends(get_db)):
+    return db.scalars(
         select(Alert).order_by(Alert.id)
     ).all()
 
-    return alerts
 
+# -------- FIND MATCHING FORECAST HOURS --------
 
 @app.get("/alerts/{alert_id}/matches")
 async def get_alert_matches(
     alert_id: int,
     db: Session = Depends(get_db)
 ):
-    # Retrieve the alert from PostgreSQL
     alert = db.get(Alert, alert_id)
 
     if alert is None:
@@ -191,7 +195,6 @@ async def get_alert_matches(
             detail="Alert not found"
         )
 
-    # Retrieve its associated surf spot
     spot = db.get(SurfSpot, alert.spot_id)
 
     if spot is None:
@@ -200,16 +203,13 @@ async def get_alert_matches(
             detail="Surf spot not found"
         )
 
-    # Fetch the latest marine forecast
     raw_data = await get_forecast(
         spot.latitude,
         spot.longitude
     )
 
-    # Convert the forecast into our standard format
     formatted_data = format_forecast(raw_data)
 
-    # Find hours matching the user's preferences
     matches = find_matching_hours(
         formatted_data,
         alert
@@ -222,6 +222,9 @@ async def get_alert_matches(
         "total_matches": len(matches),
         "matching_hours": matches
     }
+
+
+# -------- PAUSE / REACTIVATE ALERT --------
 
 @app.patch(
     "/alerts/{alert_id}",
@@ -248,8 +251,7 @@ def update_alert_status(
     return alert
 
 
-
-# -------- UPDATE AN ALERT --------
+# -------- EDIT ALERT --------
 
 @app.put(
     "/alerts/{alert_id}",
@@ -260,7 +262,6 @@ def edit_alert(
     update: AlertCreate,
     db: Session = Depends(get_db)
 ):
-    # Find the existing alert
     alert = db.get(Alert, alert_id)
 
     if alert is None:
@@ -269,7 +270,6 @@ def edit_alert(
             detail="Alert not found"
         )
 
-    # Verify the new surf spot exists
     spot = db.get(SurfSpot, update.spot_id)
 
     if spot is None:
@@ -278,7 +278,6 @@ def edit_alert(
             detail="Surf spot not found"
         )
 
-    # Update its fields
     for field, value in update.model_dump().items():
         setattr(alert, field, value)
 
@@ -288,7 +287,7 @@ def edit_alert(
     return alert
 
 
-# -------- DELETE AN ALERT --------
+# -------- DELETE ALERT --------
 
 @app.delete(
     "/alerts/{alert_id}",
@@ -306,21 +305,19 @@ def delete_alert(
             detail="Alert not found"
         )
 
-    # Remove saved match records first
+    # Delete related forecast matches
     db.execute(
         delete(AlertMatch).where(
             AlertMatch.alert_id == alert_id
         )
     )
 
-    # Remove notification delivery history
+    # Delete notification delivery records
     db.execute(
         delete(NotificationDelivery).where(
             NotificationDelivery.alert_id == alert_id
         )
     )
 
-    # Finally remove the alert itself
     db.delete(alert)
-
     db.commit()

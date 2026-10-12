@@ -1,0 +1,89 @@
+
+.surf-forecast-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.surf-forecast-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.surf-forecast-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  color: #172b3a;
+}
+
+.surf-forecast-label {
+  font-size: 11px;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.surf-forecast-primary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.surf-forecast-primary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.surf-forecast-primary strong {
+  font-size: 19px;
+  color: #172b3a;
+}
+
+.surf-forecast-primary .wave-value {
+  font-size: 25px;
+  color: #087695;
+}
+
+.surf-forecast-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 12px;
+  margin-top: 20px;
+}
+
+.forecast-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.forecast-metric strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #172b3a;
+}
+
+@media (max-width: 600px) {
+  .surf-forecast-card {
+    padding: 16px;
+  }
+
+  .surf-forecast-primary .wave-value {
+    font-size: 22px;
+  }
+}

@@ -1,5 +1,7 @@
-
 import { useEffect, useState, type FormEvent } from "react";
+import ForecastCard, {
+  type ForecastHour,
+} from "./components/ForecastCard";
 
 type SurfSpot = {
   id: number;
@@ -8,14 +10,6 @@ type SurfSpot = {
   latitude: number;
   longitude: number;
   region: string;
-};
-
-type ForecastHour = {
-  time: string;
-  wave_height_ft: number | null;
-  wave_period_s: number | null;
-  swell_height_ft: number | null;
-  swell_period_s: number | null;
 };
 
 type SpotForecast = {
@@ -31,6 +25,7 @@ type SurfAlert = {
   min_wave_height_ft: number;
   max_wave_height_ft: number;
   min_swell_period_s: number;
+  max_wind_speed_kn: number | null;
   is_active: boolean;
 };
 
@@ -40,7 +35,10 @@ type AlertFormValues = {
   min_wave_height_ft: string;
   max_wave_height_ft: string;
   min_swell_period_s: string;
+  max_wind_speed_kn: string;
 };
+
+// -------- HELPER FUNCTIONS --------
 
 function currentPacificHour(): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -70,7 +68,7 @@ function validateAlert(values: AlertFormValues): string | null {
     !values.max_wave_height_ft ||
     !values.min_swell_period_s
   ) {
-    return "Please fill out all fields.";
+    return "Please fill out all required fields.";
   }
 
   if (
@@ -85,7 +83,15 @@ function validateAlert(values: AlertFormValues): string | null {
   }
 
   if (min > max) {
-    return "Minimum wave height cannot exceed maximum.";
+    return "Minimum wave height cannot exceed maximum wave height.";
+  }
+
+  if (values.max_wind_speed_kn.trim() !== "") {
+    const maxWind = Number(values.max_wind_speed_kn);
+
+    if (!Number.isFinite(maxWind) || maxWind < 0) {
+      return "Maximum wind speed must be zero or greater.";
+    }
   }
 
   return null;
@@ -101,54 +107,65 @@ function makeAlertPayload(
     min_wave_height_ft: Number(values.min_wave_height_ft),
     max_wave_height_ft: Number(values.max_wave_height_ft),
     min_swell_period_s: Number(values.min_swell_period_s),
+
+    max_wind_speed_kn:
+      values.max_wind_speed_kn.trim() === ""
+        ? null
+        : Number(values.max_wind_speed_kn),
+
     is_active: isActive,
   };
 }
 
+// -------- MAIN APP --------
+
 function App() {
-  // Surf spots and forecasts
   const [spots, setSpots] = useState<SurfSpot[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
+
   const [forecast, setForecast] = useState<ForecastHour[]>([]);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastError, setForecastError] = useState("");
 
-  // Saved alerts
   const [alerts, setAlerts] = useState<SurfAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [busyAlertId, setBusyAlertId] = useState<number | null>(null);
 
-  // New alert form
+  // -------- CREATE FORM --------
+
   const [createValues, setCreateValues] = useState<AlertFormValues>({
     name: "",
     spot_id: "",
     min_wave_height_ft: "3",
     max_wave_height_ft: "6",
     min_swell_period_s: "12",
+    max_wind_speed_kn: "",
   });
 
   const [savingAlert, setSavingAlert] = useState(false);
   const [formError, setFormError] = useState("");
   const [formMessage, setFormMessage] = useState("");
 
-  // Editing an existing alert
+  // -------- EDIT FORM --------
+
   const [editingId, setEditingId] = useState<number | null>(null);
+
   const [editValues, setEditValues] = useState<AlertFormValues>({
     name: "",
     spot_id: "",
     min_wave_height_ft: "",
     max_wave_height_ft: "",
     min_swell_period_s: "",
+    max_wind_speed_kn: "",
   });
 
-  // Deleting an alert
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
-  // Saved alert feedback
   const [alertError, setAlertError] = useState("");
   const [dashboardError, setDashboardError] = useState("");
 
-  // Load surf spots and saved alerts
+  // -------- LOAD DATA --------
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -183,7 +200,8 @@ function App() {
     loadData();
   }, []);
 
-  // Load the forecast for a selected surf spot
+  // -------- FETCH FORECAST --------
+
   async function selectSpot(spot: SurfSpot) {
     setSelectedSpot(spot);
     setForecast([]);
@@ -213,9 +231,11 @@ function App() {
     }
   }
 
-  // Create a new alert
+  // -------- CREATE ALERT --------
+
   async function createAlert(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     setFormError("");
     setFormMessage("");
 
@@ -234,11 +254,13 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(makeAlertPayload(createValues, true)),
+        body: JSON.stringify(
+          makeAlertPayload(createValues, true)
+        ),
       });
 
       if (!response.ok) {
-        throw new Error("Create alert failed");
+        throw new Error("Create failed");
       }
 
       const newAlert: SurfAlert = await response.json();
@@ -258,7 +280,8 @@ function App() {
     }
   }
 
-  // Pause or reactivate an alert
+  // -------- PAUSE / REACTIVATE --------
+
   async function toggleAlert(alert: SurfAlert) {
     setAlertError("");
     setBusyAlertId(alert.id);
@@ -292,7 +315,8 @@ function App() {
     }
   }
 
-  // Open the edit form
+  // -------- OPEN EDIT FORM --------
+
   function startEditing(alert: SurfAlert) {
     setAlertError("");
     setDeleteConfirmId(null);
@@ -304,10 +328,15 @@ function App() {
       min_wave_height_ft: String(alert.min_wave_height_ft),
       max_wave_height_ft: String(alert.max_wave_height_ft),
       min_swell_period_s: String(alert.min_swell_period_s),
+      max_wind_speed_kn:
+        alert.max_wind_speed_kn === null
+          ? ""
+          : String(alert.max_wind_speed_kn),
     });
   }
 
-  // Save edited alert preferences
+  // -------- SAVE EDITED ALERT --------
+
   async function saveEdit(
     event: FormEvent<HTMLFormElement>,
     alert: SurfAlert
@@ -355,7 +384,8 @@ function App() {
     }
   }
 
-  // Permanently delete an alert
+  // -------- DELETE ALERT --------
+
   async function deleteAlert(alertId: number) {
     setAlertError("");
     setBusyAlertId(alertId);
@@ -389,18 +419,26 @@ function App() {
     );
   }
 
+  // -------- RENDER --------
+
   return (
     <main className="dashboard">
+
+      {/* HEADER */}
+
       <header>
         <h1>Surf Alerts</h1>
         <p>Your personalized surf forecasting dashboard.</p>
       </header>
 
       {dashboardError && (
-        <p className="error" role="alert">{dashboardError}</p>
+        <p className="error" role="alert">
+          {dashboardError}
+        </p>
       )}
 
-      {/* Surf spots */}
+      {/* SURF SPOTS */}
+
       <section>
         <h2>Surf Spots</h2>
 
@@ -424,11 +462,16 @@ function App() {
         </div>
       </section>
 
-      {/* Forecast */}
-      {forecastLoading && <p>Loading forecast...</p>}
+      {/* FORECAST */}
+
+      {forecastLoading && (
+        <p>Loading forecast...</p>
+      )}
 
       {forecastError && (
-        <p className="error" role="alert">{forecastError}</p>
+        <p className="error" role="alert">
+          {forecastError}
+        </p>
       )}
 
       {selectedSpot && !forecastLoading && !forecastError && (
@@ -445,44 +488,32 @@ function App() {
           ) : (
             <div className="forecast-grid">
               {forecast.map((hour) => (
-                <div className="forecast-card" key={hour.time}>
-                  <h3>{hour.time.replace("T", " ")}</h3>
-
-                  <p>
-                    Wave Height:
-                    <strong> {hour.wave_height_ft ?? "N/A"} ft</strong>
-                  </p>
-                  <p>
-                    Wave Period:
-                    <strong> {hour.wave_period_s ?? "N/A"} s</strong>
-                  </p>
-                  <p>
-                    Swell Height:
-                    <strong> {hour.swell_height_ft ?? "N/A"} ft</strong>
-                  </p>
-                  <p>
-                    Swell Period:
-                    <strong> {hour.swell_period_s ?? "N/A"} s</strong>
-                  </p>
-                </div>
+                <ForecastCard
+                  key={hour.time}
+                  forecast={hour}
+                />
               ))}
             </div>
           )}
         </section>
       )}
 
-      {/* Create alert */}
+      {/* CREATE ALERT */}
+
       <section className="alert-section">
         <h2>Create a Surf Alert</h2>
 
         <form className="alert-form" onSubmit={createAlert}>
+
           <div className="form-group">
             <label htmlFor="alert-name">Alert Name</label>
+
             <input
               id="alert-name"
               type="text"
               maxLength={100}
               required
+              placeholder="Morning Surf Session"
               value={createValues.name}
               onChange={(e) =>
                 setCreateValues((previous) => ({
@@ -490,12 +521,12 @@ function App() {
                   name: e.target.value,
                 }))
               }
-              placeholder="Morning Surf Session"
             />
           </div>
 
           <div className="form-group">
             <label htmlFor="alert-spot">Surf Spot</label>
+
             <select
               id="alert-spot"
               required
@@ -516,10 +547,12 @@ function App() {
           </div>
 
           <div className="form-row">
+
             <div className="form-group">
               <label htmlFor="min-wave">
                 Minimum Wave Height (ft)
               </label>
+
               <input
                 id="min-wave"
                 type="number"
@@ -540,6 +573,7 @@ function App() {
               <label htmlFor="max-wave">
                 Maximum Wave Height (ft)
               </label>
+
               <input
                 id="max-wave"
                 type="number"
@@ -555,12 +589,14 @@ function App() {
                 }
               />
             </div>
+
           </div>
 
           <div className="form-group">
             <label htmlFor="min-period">
               Minimum Swell Period (seconds)
             </label>
+
             <input
               id="min-period"
               type="number"
@@ -576,6 +612,35 @@ function App() {
               }
             />
           </div>
+
+          {/* NEW WIND SPEED FIELD */}
+
+          <div className="form-group">
+            <label htmlFor="max-wind">
+              Maximum Wind Speed (knots)
+            </label>
+
+            <input
+              id="max-wind"
+              type="number"
+              min="0"
+              step="0.1"
+              placeholder="Optional, e.g. 8"
+              value={createValues.max_wind_speed_kn}
+              onChange={(e) =>
+                setCreateValues((previous) => ({
+                  ...previous,
+                  max_wind_speed_kn: e.target.value,
+                }))
+              }
+            />
+
+            <small>
+              Leave blank for no wind speed restriction.
+            </small>
+          </div>
+
+          {/* FORM NOTIFICATIONS */}
 
           {formError && (
             <div
@@ -604,26 +669,39 @@ function App() {
           >
             {savingAlert ? "Creating..." : "Create Alert"}
           </button>
+
         </form>
       </section>
 
-      {/* Saved alerts */}
+      {/* SAVED ALERTS */}
+
       <section className="alert-section">
         <h2>My Surf Alerts</h2>
 
-        {alertsLoading && <p>Loading saved alerts...</p>}
+        {alertsLoading && (
+          <p>Loading saved alerts...</p>
+        )}
 
         {!alertsLoading && alerts.length === 0 && (
           <p>You haven't created any surf alerts yet.</p>
         )}
 
         {alertError && (
-          <p className="error" role="alert">{alertError}</p>
+          <p className="error" role="alert">
+            {alertError}
+          </p>
         )}
 
         <div className="saved-alerts">
+
           {alerts.map((alert) => (
-            <div className="saved-alert-card" key={alert.id}>
+            <div
+              className="saved-alert-card"
+              key={alert.id}
+            >
+
+              {/* ALERT HEADING */}
+
               <div className="alert-heading">
                 <div>
                   <h3>{alert.name}</h3>
@@ -639,35 +717,49 @@ function App() {
                     }
                     aria-hidden="true"
                   />
+
                   <span>
                     {alert.is_active ? "Active" : "Paused"}
                   </span>
                 </div>
               </div>
 
+              {/* SAVED CONDITIONS */}
+
               <p>
                 Waves: {alert.min_wave_height_ft}–
                 {alert.max_wave_height_ft} ft
               </p>
+
               <p>
                 Minimum swell period: {alert.min_swell_period_s} s
               </p>
 
-              {/* Edit form */}
+              <p>
+                Maximum wind speed:{" "}
+                {alert.max_wind_speed_kn === null
+                  ? "No restriction"
+                  : `${alert.max_wind_speed_kn} kn`}
+              </p>
+
+              {/* EDIT FORM */}
+
               {editingId === alert.id && (
                 <form
                   className="edit-form"
                   onSubmit={(event) => saveEdit(event, alert)}
                 >
+
                   <div className="form-group">
                     <label htmlFor={`edit-name-${alert.id}`}>
                       Alert Name
                     </label>
+
                     <input
                       id={`edit-name-${alert.id}`}
                       type="text"
-                      maxLength={100}
                       required
+                      maxLength={100}
                       value={editValues.name}
                       onChange={(e) =>
                         setEditValues((previous) => ({
@@ -682,8 +774,10 @@ function App() {
                     <label htmlFor={`edit-spot-${alert.id}`}>
                       Surf Spot
                     </label>
+
                     <select
                       id={`edit-spot-${alert.id}`}
+                      required
                       value={editValues.spot_id}
                       onChange={(e) =>
                         setEditValues((previous) => ({
@@ -704,6 +798,7 @@ function App() {
                     <label htmlFor={`edit-min-${alert.id}`}>
                       Minimum Wave Height (ft)
                     </label>
+
                     <input
                       id={`edit-min-${alert.id}`}
                       type="number"
@@ -724,6 +819,7 @@ function App() {
                     <label htmlFor={`edit-max-${alert.id}`}>
                       Maximum Wave Height (ft)
                     </label>
+
                     <input
                       id={`edit-max-${alert.id}`}
                       type="number"
@@ -744,6 +840,7 @@ function App() {
                     <label htmlFor={`edit-period-${alert.id}`}>
                       Minimum Swell Period (seconds)
                     </label>
+
                     <input
                       id={`edit-period-${alert.id}`}
                       type="number"
@@ -760,7 +857,35 @@ function App() {
                     />
                   </div>
 
+                  {/* NEW EDIT WIND FIELD */}
+
+                  <div className="form-group">
+                    <label htmlFor={`edit-wind-${alert.id}`}>
+                      Maximum Wind Speed (knots)
+                    </label>
+
+                    <input
+                      id={`edit-wind-${alert.id}`}
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="Optional"
+                      value={editValues.max_wind_speed_kn}
+                      onChange={(e) =>
+                        setEditValues((previous) => ({
+                          ...previous,
+                          max_wind_speed_kn: e.target.value,
+                        }))
+                      }
+                    />
+
+                    <small>
+                      Leave blank for no wind restriction.
+                    </small>
+                  </div>
+
                   <div className="alert-actions">
+
                     <button
                       className="primary-button"
                       type="submit"
@@ -779,14 +904,17 @@ function App() {
                     >
                       Cancel
                     </button>
+
                   </div>
                 </form>
               )}
 
-              {/* Normal alert controls */}
+              {/* NORMAL ALERT BUTTONS */}
+
               {editingId !== alert.id &&
                 deleteConfirmId !== alert.id && (
                   <div className="alert-actions">
+
                     <button
                       className="secondary-button"
                       type="button"
@@ -821,19 +949,24 @@ function App() {
                     >
                       Delete
                     </button>
+
                   </div>
                 )}
 
-              {/* Delete confirmation */}
+              {/* DELETE CONFIRMATION */}
+
               {deleteConfirmId === alert.id && (
                 <div className="delete-confirmation">
+
                   <p>
-                    Permanently delete <strong>{alert.name}</strong>?
+                    Permanently delete{" "}
+                    <strong>{alert.name}</strong>?
                     Its saved matches and notification history
                     will also be removed.
                   </p>
 
                   <div className="alert-actions">
+
                     <button
                       className="delete-button"
                       type="button"
@@ -853,13 +986,17 @@ function App() {
                     >
                       Cancel
                     </button>
+
                   </div>
                 </div>
               )}
+
             </div>
           ))}
+
         </div>
       </section>
+
     </main>
   );
 }

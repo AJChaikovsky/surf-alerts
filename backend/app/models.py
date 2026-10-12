@@ -1,23 +1,20 @@
-from sqlalchemy import Float, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.database import Base
-from sqlalchemy import Boolean, ForeignKey, CheckConstraint
-
 from datetime import date, datetime
 
 from sqlalchemy import (
-    Integer,
-    String,
-    Float,
     Boolean,
-    ForeignKey,
+    CheckConstraint,
     Date,
     DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
     UniqueConstraint,
-    CheckConstraint,
     func,
 )
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.database import Base
 
 
 class SurfSpot(Base):
@@ -47,13 +44,14 @@ class SurfSpot(Base):
         String(100), nullable=False
     )
 
+
 class Alert(Base):
     __tablename__ = "alerts"
 
     __table_args__ = (
         CheckConstraint(
             "min_wave_height_ft <= max_wave_height_ft",
-            name="valid_wave_height_range"
+            name="valid_wave_height_range",
         ),
     )
 
@@ -82,6 +80,12 @@ class Alert(Base):
         Float, nullable=False
     )
 
+    max_wind_speed_kn: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+        default=None
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False
     )
@@ -94,7 +98,7 @@ class AlertMatch(Base):
         UniqueConstraint(
             "alert_id",
             "forecast_time",
-            name="uq_alert_matches_alert_time"
+            name="uq_alert_matches_alert_time",
         ),
     )
 
@@ -127,7 +131,7 @@ class NotificationDelivery(Base):
         UniqueConstraint(
             "alert_id",
             "surf_date",
-            name="uq_notification_alert_date"
+            name="uq_notification_alert_date",
         ),
     )
 
