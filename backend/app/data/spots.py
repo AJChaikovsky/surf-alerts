@@ -1,4 +1,3 @@
-
 SURF_SPOTS = {
     "el-porto": {
         "name": "El Porto",

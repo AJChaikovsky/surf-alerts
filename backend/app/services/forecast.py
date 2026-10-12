@@ -1,4 +1,3 @@
-
 import httpx
 
 MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"

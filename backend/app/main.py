@@ -1,7 +1,16 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import SurfSpot
 from app.services.forecast import get_forecast, format_forecast
-from fastapi import HTTPException
-from app.data.spots import SURF_SPOTS
+from sqlalchemy.exc import IntegrityError
+from app.schemas import SurfSpotCreate, SurfSpotResponse
+
+from app.models import Alert
+from app.schemas import AlertCreate, AlertResponse
+
 
 app = FastAPI(title="Surf Alerts API")
 
@@ -25,24 +34,40 @@ async def forecast(latitude: float, longitude: float):
 async def forecast_summary(latitude: float, longitude: float):
     raw_data = await get_forecast(latitude, longitude)
 
-    formatted_data = format_forecast(raw_data)
-
     return {
         "location": {
             "latitude": latitude,
             "longitude": longitude
         },
-        "forecast": formatted_data
+        "forecast": format_forecast(raw_data)
     }
 
+
 @app.get("/spots")
-def list_spots():
-    return SURF_SPOTS
+def list_spots(db: Session = Depends(get_db)):
+    spots = db.scalars(select(SurfSpot)).all()
+
+    return [
+        {
+            "id": spot.id,
+            "slug": spot.slug,
+            "name": spot.name,
+            "latitude": spot.latitude,
+            "longitude": spot.longitude,
+            "region": spot.region
+        }
+        for spot in spots
+    ]
 
 
 @app.get("/spots/{spot_id}/forecast")
-async def spot_forecast(spot_id: str):
-    spot = SURF_SPOTS.get(spot_id)
+async def spot_forecast(
+    spot_id: str,
+    db: Session = Depends(get_db)
+):
+    spot = db.scalar(
+        select(SurfSpot).where(SurfSpot.slug == spot_id)
+    )
 
     if spot is None:
         raise HTTPException(
@@ -51,14 +76,95 @@ async def spot_forecast(spot_id: str):
         )
 
     raw_data = await get_forecast(
-        spot["latitude"],
-        spot["longitude"]
+        spot.latitude,
+        spot.longitude
     )
 
-    formatted_data = format_forecast(raw_data)
-
     return {
-        "spot": spot["name"],
-        "region": spot["region"],
-        "forecast": formatted_data
+        "spot": spot.name,
+        "region": spot.region,
+        "forecast": format_forecast(raw_data)
     }
+
+
+@app.post(
+    "/spots",
+    response_model=SurfSpotResponse,
+    status_code=201
+)
+def create_spot(
+    spot: SurfSpotCreate,
+    db: Session = Depends(get_db)
+):
+    # Check whether the spot already exists
+    existing_spot = db.scalar(
+        select(SurfSpot).where(
+            SurfSpot.slug == spot.slug
+        )
+    )
+
+    if existing_spot:
+        raise HTTPException(
+            status_code=409,
+            detail="Surf spot already exists"
+        )
+
+    # Create a new database model
+    new_spot = SurfSpot(**spot.model_dump())
+
+    # Save to PostgreSQL
+    try:
+        db.add(new_spot)
+        db.commit()
+        db.refresh(new_spot)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Surf spot already exists"
+        )
+
+    return new_spot
+
+
+@app.post(
+    "/alerts",
+    response_model=AlertResponse,
+    status_code=201
+)
+def create_alert(
+    alert: AlertCreate,
+    db: Session = Depends(get_db)
+):
+    # Verify the surf spot exists
+    spot = db.get(SurfSpot, alert.spot_id)
+
+    if spot is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Surf spot not found"
+        )
+
+    # Create a new alert
+    new_alert = Alert(**alert.model_dump())
+
+    # Store it in PostgreSQL
+    db.add(new_alert)
+    db.commit()
+    db.refresh(new_alert)
+
+    return new_alert
+
+
+@app.get(
+    "/alerts",
+    response_model=list[AlertResponse]
+)
+def list_alerts(
+    db: Session = Depends(get_db)
+):
+    alerts = db.scalars(
+        select(Alert).order_by(Alert.id)
+    ).all()
+
+    return alerts
