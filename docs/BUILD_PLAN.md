@@ -25,6 +25,46 @@ This document describes what the app does, how it works, where it stands, and wh
 - ✅ Interactive map of every spot, with current conditions and alert-match colors.
 - ⬜ Deployment, README and demo.
 
+### Resume here (paused October 18, 2026)
+
+Everything is committed and pushed to `main`. The database is at migration `c532fa799b65`, and the backend tests (63), lint, and build all pass. To start the app again, follow the **Running it locally** steps in the [README](../README.md).
+
+**In progress: verifying my email domain in Resend.** I started adding `surf-alerts.<my domain>` under Resend → Domains, but haven't added the DNS records yet. To finish:
+
+1. In my domain's DNS settings, add the records Resend lists, copying each value with its copy button rather than retyping it:
+   - TXT `resend._domainkey.surf-alerts` (DKIM);
+   - CNAME `rsend.surf-alerts`;
+   - CNAME `send.surf-alerts`;
+   - optionally, TXT `_dmarc`, unless the domain already has one.
+2. Enter names exactly as shown, since most providers add the domain themselves. On Cloudflare, set the CNAMEs to "DNS only". Leave "Enable Receiving" off.
+3. Click **Verify DNS Records** in Resend. This can take minutes to a few hours.
+4. Once verified, change `EMAIL_FROM` in `backend/.env` to an address on that domain, e.g. `Surf Alerts <alerts@surf-alerts.<my domain>>`.
+5. Do one controlled send to an account whose email *isn't* my Resend login, to prove other users can receive alerts.
+
+**Next: deployment prep** (code only; none of it needs a hosting account):
+
+1. Serve the built React app from FastAPI in production, so the site and API share one origin. Separate subdomains on a free host count as different sites, and the browser wouldn't send the `SameSite=Lax` session cookie.
+2. Production settings:
+   - `COOKIE_SECURE=true`;
+   - uvicorn `--proxy-headers`, so rate limits see real IPs;
+   - read the host's `DATABASE_URL` format;
+   - run migrations and the seed on deploy.
+3. Add a one-shot worker command (`python -m app.worker --once`) for a scheduled job every 30 minutes.
+4. Add a password policy, and check that no secrets reach the frontend bundle.
+
+Then pick a host (Render, Railway, or Fly.io) for the web service, PostgreSQL, and the scheduled job.
+
+**Things to remember when I come back:**
+
+- **`backend/.env` currently has `EMAIL_NOTIFICATIONS_ENABLED=true`.** Any worker run sends real emails. Set it back to `false` unless I'm deliberately testing a send.
+- Until the domain is verified, Resend only delivers to my Resend login's address; sends to anyone else are recorded as `failed`.
+- A `failed` or `sent` delivery blocks any further email for that alert and surf day. To test a send on a day that's already used, create a new alert.
+- Alert 9 ("Email Notification Test") is paused.
+- Activate `backend/.venv` in every new terminal.
+- After big frontend changes, hard-refresh the browser (Cmd+Shift+R).
+- Rate-limit counters (logins, local-break adds) live in memory and reset when the API restarts.
+- `requirements.txt` was regenerated from the working environment, so a fresh `pip install -r requirements.txt` works. It had been missing the login packages.
+
 ---
 
 ## 1. What the App Does
@@ -181,6 +221,7 @@ The Alembic directory is `migrations/`, not `alembic/`.
 ```text
 surf-alerts/
 ├── .gitignore
+├── README.md                   # What it is and how to run it
 ├── docs/
 │   └── BUILD_PLAN.md               # This file
 ├── backend/
