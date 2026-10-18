@@ -6,21 +6,26 @@ from pydantic import (
 )
 
 
-class SurfSpotCreate(BaseModel):
-    slug: str = Field(
-        min_length=1,
-        max_length=100,
-        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
-    )
-
+class LocalBreakCreate(BaseModel):
+    # A user's private break; the server assigns the slug and owner.
     name: str = Field(min_length=1, max_length=100)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
-    region: str = Field(min_length=1, max_length=100)
+    region: str = Field(default="", max_length=100)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class SurfSpotResponse(SurfSpotCreate):
+class SurfSpotResponse(BaseModel):
     id: int
+    slug: str
+    name: str
+    latitude: float
+    longitude: float
+    region: str
+
+    # True for the current user's own local breaks.
+    is_custom: bool
 
     model_config = ConfigDict(from_attributes=True)
 

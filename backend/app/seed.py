@@ -1,32 +1,31 @@
-
 from sqlalchemy import select
 
+from app.data.spots import SURF_SPOTS
 from app.database import SessionLocal
 from app.models import SurfSpot
 
 
 def seed_spots():
+    # Only add spots that are missing, so existing spots (and the
+    # alerts that reference them) are never changed. Safe to rerun.
     with SessionLocal() as db:
-        existing_spot = db.scalar(
-            select(SurfSpot).where(SurfSpot.slug == "el-porto")
-        )
+        existing_slugs = set(db.scalars(select(SurfSpot.slug)))
 
-        if existing_spot:
-            print("El Porto already exists!")
-            return
+        added = []
 
-        el_porto = SurfSpot(
-            slug="el-porto",
-            name="El Porto",
-            latitude=33.90,
-            longitude=-118.43,
-            region="South Bay"
-        )
+        for slug, spot in SURF_SPOTS.items():
+            if slug in existing_slugs:
+                continue
 
-        db.add(el_porto)
+            db.add(SurfSpot(slug=slug, **spot))
+            added.append(spot["name"])
+
         db.commit()
 
-        print("Successfully added El Porto!")
+    if added:
+        print(f"Added {len(added)} surf spots: {', '.join(added)}")
+    else:
+        print("All surf spots already exist.")
 
 
 if __name__ == "__main__":

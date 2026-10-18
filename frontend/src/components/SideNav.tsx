@@ -1,9 +1,10 @@
 import "./SideNav.css";
 
-export type Page = "spots" | "alerts" | "history";
+export type Page = "spots" | "breaks" | "alerts" | "history";
 
 const NAV_ITEMS: { page: Page; label: string }[] = [
   { page: "spots", label: "Surf Spots" },
+  { page: "breaks", label: "Local Breaks" },
   { page: "alerts", label: "My Alerts" },
   { page: "history", label: "Alert History" },
 ];

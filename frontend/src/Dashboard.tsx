@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import ForecastCard, {
   type ForecastHour,
 } from "./components/ForecastCard";
 import { apiFetch } from "./api";
+import { currentPacificHour } from "./time";
 
 export type DashboardView = "spots" | "alerts";
 
@@ -13,6 +14,7 @@ type SurfSpot = {
   latitude: number;
   longitude: number;
   region: string;
+  is_custom: boolean;
 };
 
 type SpotForecast = {
@@ -42,22 +44,6 @@ type AlertFormValues = {
 };
 
 // -------- HELPER FUNCTIONS --------
-
-function currentPacificHour(): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date());
-
-  const get = (type: string) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:00`;
-}
 
 function validateAlert(values: AlertFormValues): string | null {
   const min = Number(values.min_wave_height_ft);
@@ -100,6 +86,42 @@ function validateAlert(values: AlertFormValues): string | null {
   return null;
 }
 
+const LOCAL_BREAKS_GROUP = "My Local Breaks";
+
+// Group spots by region, ordering regions and spots north to south.
+// The user's own local breaks come first, in a group of their own.
+function groupSpotsByRegion(
+  spots: SurfSpot[]
+): { region: string; spots: SurfSpot[] }[] {
+  const groups = new Map<string, SurfSpot[]>();
+
+  for (const spot of spots) {
+    const group = spot.is_custom ? LOCAL_BREAKS_GROUP : spot.region;
+    groups.set(group, [...(groups.get(group) ?? []), spot]);
+  }
+
+  return [...groups.entries()]
+    .map(([region, regionSpots]) => ({
+      region,
+      spots: [...regionSpots].sort((a, b) => b.latitude - a.latitude),
+    }))
+    .sort((a, b) => {
+      if (a.region === LOCAL_BREAKS_GROUP) return -1;
+      if (b.region === LOCAL_BREAKS_GROUP) return 1;
+      return b.spots[0].latitude - a.spots[0].latitude;
+    });
+}
+
+function matchesSpotSearch(spot: SurfSpot, query: string): boolean {
+  const search = query.trim().toLowerCase();
+
+  return (
+    search === "" ||
+    spot.name.toLowerCase().includes(search) ||
+    spot.region.toLowerCase().includes(search)
+  );
+}
+
 function makeAlertPayload(
   values: AlertFormValues,
   isActive: boolean
@@ -129,6 +151,9 @@ function App({ view }: { view: DashboardView }) {
   const [forecast, setForecast] = useState<ForecastHour[]>([]);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastError, setForecastError] = useState("");
+
+  const [spotSearch, setSpotSearch] = useState("");
+  const forecastRef = useRef<HTMLElement | null>(null);
 
   const [alerts, setAlerts] = useState<SurfAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
@@ -202,6 +227,18 @@ function App({ view }: { view: DashboardView }) {
 
     loadData();
   }, []);
+
+  // -------- SCROLL TO FORECAST --------
+  // With many spots the forecast renders far below the cards.
+
+  useEffect(() => {
+    if (selectedSpot && !forecastLoading) {
+      forecastRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [selectedSpot, forecastLoading]);
 
   // -------- FETCH FORECAST --------
 
@@ -456,24 +493,51 @@ function App({ view }: { view: DashboardView }) {
           <section>
             <h2>Surf Spots</h2>
 
-            <div className="spot-grid">
-              {spots.map((spot) => (
-                <button
-                  key={spot.id}
-                  type="button"
-                  className={
-                    selectedSpot?.id === spot.id
-                      ? "spot-card selected"
-                      : "spot-card"
-                  }
-                  onClick={() => selectSpot(spot)}
-                >
-                  <h3>{spot.name}</h3>
-                  <p>{spot.region}</p>
-                  <span>View Forecast →</span>
-                </button>
-              ))}
+            <div className="spot-search">
+              <label htmlFor="spot-search">Search spots</label>
+
+              <input
+                id="spot-search"
+                type="search"
+                placeholder="Search by name or region, e.g. Trestles or San Diego"
+                value={spotSearch}
+                onChange={(e) => setSpotSearch(e.target.value)}
+              />
             </div>
+
+            {spots.length > 0 &&
+              !spots.some((spot) => matchesSpotSearch(spot, spotSearch)) && (
+                <p className="spot-search-empty">
+                  No spots match "{spotSearch.trim()}".
+                </p>
+              )}
+
+            {groupSpotsByRegion(
+              spots.filter((spot) => matchesSpotSearch(spot, spotSearch))
+            ).map((group) => (
+              <div className="spot-region" key={group.region}>
+                <h3 className="spot-region-heading">{group.region}</h3>
+
+                <div className="spot-grid">
+                  {group.spots.map((spot) => (
+                    <button
+                      key={spot.id}
+                      type="button"
+                      className={
+                        selectedSpot?.id === spot.id
+                          ? "spot-card selected"
+                          : "spot-card"
+                      }
+                      onClick={() => selectSpot(spot)}
+                    >
+                      <h3>{spot.name}</h3>
+                      <p>{spot.region}</p>
+                      <span>View Forecast →</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </section>
 
           {/* FORECAST */}
@@ -489,7 +553,7 @@ function App({ view }: { view: DashboardView }) {
           )}
 
           {selectedSpot && !forecastLoading && !forecastError && (
-            <section className="forecast-section">
+            <section className="forecast-section" ref={forecastRef}>
               <h2>{selectedSpot.name} Forecast</h2>
 
               <p className="forecast-note">
@@ -556,10 +620,14 @@ function App({ view }: { view: DashboardView }) {
                     }))
                   }
                 >
-                  {spots.map((spot) => (
-                    <option key={spot.id} value={spot.id}>
-                      {spot.name}
-                    </option>
+                  {groupSpotsByRegion(spots).map((group) => (
+                    <optgroup key={group.region} label={group.region}>
+                      {group.spots.map((spot) => (
+                        <option key={spot.id} value={spot.id}>
+                          {spot.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -804,10 +872,14 @@ function App({ view }: { view: DashboardView }) {
                             }))
                           }
                         >
-                          {spots.map((spot) => (
-                            <option key={spot.id} value={spot.id}>
-                              {spot.name}
-                            </option>
+                          {groupSpotsByRegion(spots).map((group) => (
+                            <optgroup key={group.region} label={group.region}>
+                              {group.spots.map((spot) => (
+                                <option key={spot.id} value={spot.id}>
+                                  {spot.name}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                       </div>

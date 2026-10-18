@@ -20,6 +20,8 @@ This document describes what the app does, how it works, where it stands, and wh
 - ✅ Email notifications end to end: dry run, a real send to the alert's owner, failure handling, and once-per-day deduplication.
 - ✅ CSRF protection and login/registration rate limiting.
 - ✅ Server-side session revocation and security event logging.
+- ✅ 17 Southern California breaks with search and region grouping.
+- ✅ Local Breaks: each user can add up to 3 private breaks of their own.
 - ⬜ Deployment, README and demo.
 
 ---
@@ -40,14 +42,15 @@ Forecast values are **modeled estimates**, not guarantees of breaking-wave heigh
 
 1. **Sign in:** A new visitor sees a Login / Register page. A returning visitor with a valid session goes straight in.
 2. **Create an account:** An email and password. The password is hashed, and the session lives in an HTTP-only cookie.
-3. **Navigate:** A side menu (tabs at the top on narrow screens) links to **Surf Spots**, **My Alerts**, and **Alert History**. Each page has its own URL (`#/spots`, `#/alerts`, `#/history`), so refreshing and the back button keep your place.
-4. **Surf Spots:** Pick a spot card (e.g. **El Porto**, **Malibu Surfrider**) to see the next 12 hours of wave height and period, swell height, period, and direction, and wind speed and direction, in local time with compass labels.
-5. **My Alerts — create:** Name an alert, choose a break, and set minimum and maximum wave height, minimum swell period, and an optional maximum wind speed.
-6. **My Alerts — manage:** Edit thresholds, pause or reactivate, or delete with a confirmation step. A green circle means active; orange means paused.
-7. **Monitoring:** A background worker checks every active alert every 30 minutes and saves newly matching forecast hours.
-8. **Notifications:** When an alert matches, the account that owns it gets an email, at most once per alert per surf day.
-9. **Alert History:** Choose an alert to see its saved matching forecast hours and every email attempt with its status.
-10. **Coming back:** Everything is stored in PostgreSQL. Logging out ends the session; logging back in shows only that account's alerts.
+3. **Navigate:** A side menu (tabs at the top on narrow screens) links to **Surf Spots**, **Local Breaks**, **My Alerts**, and **Alert History**. Each page has its own URL (`#/spots`, `#/breaks`, `#/alerts`, `#/history`), so refreshing and the back button keep your place.
+4. **Surf Spots:** 17 Southern California breaks, from Rincon to Ocean Beach, grouped by region (Ventura, Malibu, South Bay, Orange County, San Diego) from north to south. A search box filters by spot name or region. Picking a spot scrolls to the next 12 hours of wave height and period, swell height, period, and direction, and wind speed and direction, in local time with compass labels.
+5. **Local Breaks:** A dedicated page for adding up to 3 breaks of your own, by name and coordinates (pasted straight from Google Maps). The app looks up wave data for the point before saving: if it finds some, it saves the break and shows the coming hour's waves, swell period, and wind; if not, it shows "Unable to retrieve data" and saves nothing. Local breaks are private: they appear only in your own Surf Spots list, under **My Local Breaks**, and in your alert options. A break an alert still uses can't be deleted.
+6. **My Alerts — create:** Name an alert, choose a break (the dropdown is grouped by region), and set minimum and maximum wave height, minimum swell period, and an optional maximum wind speed.
+7. **My Alerts — manage:** Edit thresholds, pause or reactivate, or delete with a confirmation step. A green circle means active; orange means paused.
+8. **Monitoring:** A background worker checks every active alert every 30 minutes and saves newly matching forecast hours.
+9. **Notifications:** When an alert matches, the account that owns it gets an email, at most once per alert per surf day.
+10. **Alert History:** Choose an alert to see its saved matching forecast hours and every email attempt with its status.
+11. **Coming back:** Everything is stored in PostgreSQL. Logging out ends the session; logging back in shows only that account's alerts.
 
 ### Interface details
 
@@ -76,7 +79,8 @@ Forecast values are **modeled estimates**, not guarantees of breaking-wave heigh
 
 ### Later
 
-- More breaks, and a way to add your own.
+- More curated breaks outside Southern California.
+- A map for finding breaks.
 - Offshore/onshore wind classification based on each beach's real orientation.
 - Swell-direction filters, tides, surf-quality scores, push/SMS, quiet hours, digests.
 - Maps, richer forecast charts, calendars, nicer email templates.
@@ -190,9 +194,9 @@ surf-alerts/
 │   │   ├── database.py             # Engine, sessions, Base, get_db
 │   │   ├── models.py               # User, UserSession, SurfSpot, Alert, AlertMatch, NotificationDelivery
 │   │   ├── schemas.py              # Pydantic models and validation
-│   │   ├── seed.py                 # Seeds the initial surf spots
+│   │   ├── seed.py                 # Adds any missing curated spots from data/spots.py
 │   │   ├── data/
-│   │   │   └── spots.py            # Surf spot seed data
+│   │   │   └── spots.py            # The curated list of surf spots
 │   │   ├── worker.py               # Scheduled monitoring process
 │   │   └── services/
 │   │       ├── forecast.py         # Open-Meteo fetch and normalization
@@ -226,7 +230,9 @@ surf-alerts/
             ├── ForecastCard.tsx    # One forecast hour
             ├── ForecastCard.css
             ├── AlertHistory.tsx    # Alert History page
-            └── AlertHistory.css
+            ├── AlertHistory.css
+            ├── LocalBreaks.tsx     # Local Breaks page
+            └── LocalBreaks.css
 ```
 
 ### What each piece does
@@ -234,6 +240,7 @@ surf-alerts/
 - **`App.tsx`** checks the session, shows either the login page or the app, renders the side menu, and picks the page from the URL.
 - **`Dashboard.tsx`** loads spots and the user's alerts and renders either the Surf Spots page or the My Alerts page. Switching between the two keeps the selected spot and any half-filled form.
 - **`AlertHistory.tsx`** loads one alert's saved matches and delivery records.
+- **`LocalBreaks.tsx`** adds, lists, and deletes the user's own breaks.
 - **`AuthPage.tsx`** handles login and registration, with errors shown next to the form.
 - **`ForecastCard.tsx`** displays one forecast hour with units and compass directions.
 - **`api.ts`** provides `apiFetch`, which every signed-in page uses: it adds the `X-CSRF-Token` header to state-changing requests, and on a 401 it tells `App` to show the login page, so a tab whose session ended (for example, logged out in another tab) returns to login on its next request.
@@ -287,8 +294,9 @@ There's one row per login, so each device has its own session. A user's expired 
 | `latitude` | FLOAT | −90 to 90 |
 | `longitude` | FLOAT | −180 to 180 |
 | `region` | VARCHAR(100) | Location label |
+| `user_id` | INTEGER, nullable | Empty for curated spots everyone sees; set to the owner for a private local break |
 
-Spots are shared by everyone; alerts belong to individual users.
+Curated spots are shared by everyone; local breaks and alerts belong to individual users. The curated list lives in `backend/app/data/spots.py`; `python -m app.seed` adds any curated spots from it that aren't in the database yet and never changes existing ones, so it's safe to rerun.
 
 ### `alerts`
 
@@ -364,15 +372,16 @@ A unique constraint on `(alert_id, surf_date)` allows only one email attempt per
 | GET | `/health` | Public | Health check |
 | GET | `/forecast?latitude=&longitude=` | Public | Raw forecast data |
 | GET | `/forecast/summary?...` | Public | Normalized hourly forecast |
-| GET | `/spots` | Public | List surf spots |
-| GET | `/spots/{spot_id}/forecast` | Public | Forecast for a spot, looked up by **slug** |
-| POST | `/spots` | Session + CSRF | Add a spot; duplicate slugs are rejected |
+| GET | `/spots` | Public | Curated spots, plus the signed-in user's own local breaks (`is_custom: true`) |
+| GET | `/spots/{spot_id}/forecast` | Public | Forecast for a spot, looked up by **slug**; another user's local break returns 404 |
+| POST | `/spots` | Session + CSRF | Add a local break (`name`, `latitude`, `longitude`, optional `region`). **409** at 3 breaks; **422** ("Unable to retrieve data…") if the point has no nearby wave forecast; **429** after 10 attempts per hour |
+| DELETE | `/spots/{spot_id}` | Owner + CSRF | Delete your own local break (204). **409** if an alert still uses it; curated spots and others' breaks return 404 |
 
 ### Alerts
 
 | Method | Route | Access | Behavior |
 |---|---|---|---|
-| POST | `/alerts` | Session + CSRF | Create an alert owned by the current user |
+| POST | `/alerts` | Session + CSRF | Create an alert owned by the current user, on a spot they can see |
 | GET | `/alerts` | Session | List the current user's alerts |
 | GET | `/alerts/{alert_id}/matches` | Owner | Check the latest forecast right now |
 | GET | `/alerts/{alert_id}/history` | Owner | The 20 most recent saved matches and 20 most recent email attempts |
@@ -427,6 +436,9 @@ A unique constraint on `(alert_id, surf_date)` allows only one email attempt per
 - The Surf Spots page shows the next 12 hours from the current Pacific hour.
 - The worker works in UTC; emails group matches by the Pacific-time surf day.
 - Weather and marine grid cells may differ; the numbers are model output, not readings from the beach.
+- Each spot's coordinates sit just offshore, because a point on land returns no marine data. Every spot in the list was checked to return wave, swell, and wind data.
+- The marine model's grid is coarse, so nearby breaks (El Porto and Manhattan Beach Pier, for example) can show identical numbers; at that distance the difference isn't meaningful.
+- **Checking a new local break:** Open-Meteo snaps any point to the nearest ocean grid cell (about 8 km apart), even from well inland, and reports which cell it used. A new break is accepted only if that cell is within 10 km and has wave data. That rejects points clearly inland (downtown LA, Pasadena), but a point a few km inland can still pass; catching those would need coastline data.
 
 ### Matching rule
 
@@ -478,7 +490,8 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 - **Server-side revocation:** every login creates a `user_sessions` row, and every request checks that the token's session exists and hasn't been revoked. Logout revokes it, so a copied token stops working immediately, while the user's other devices stay signed in.
 - **CSRF protection** uses a signed double-submit token. At login the server also sets a readable `csrf_token` cookie, an HMAC-SHA256 of the session token keyed with the server secret. The frontend sends it back in `X-CSRF-Token` on every change, and middleware rejects mismatches with 403. Because the token is tied to the session, one session's token can't be used with another. `/auth/me` refreshes the cookie, so sessions that existed before CSRF protection keep working.
 - **Rate limiting** caps failed logins per email and IP and per IP, and caps registrations per IP (limits in §7). A successful login resets that account's count.
-- **Authorization:** every alert route checks both the alert id and the owner. Other users' alerts return 404.
+- **Authorization:** every alert route checks both the alert id and the owner, and alerts can only use spots the user can see. Other users' alerts and local breaks return 404.
+- **Local break limits:** 3 per user, and 10 add attempts per user per hour, since each attempt calls Open-Meteo and deleting frees a slot.
 - **Security log:** the `app.security` logger records registrations, logins, failed logins, rate-limit lockouts, logouts, uses of revoked or unknown sessions, and CSRF rejections, each with the user id or email and the client IP. Passwords and tokens are never logged.
 
 ### Limitations and remaining work
@@ -488,14 +501,14 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 - Security logs currently go to the server's console; in production they should go to a log service with retention and alerts.
 - There's no "log out everywhere" yet, and changing a password (once that exists) should revoke all of a user's sessions.
 - Still to do: HTTPS-only cookies in production, a CORS and proxy review, secrets management, dependency scanning, and limits on public forecast requests.
-- Forecast and spot listing routes are public on purpose; adding a spot requires a session.
+- Forecast and spot listing routes are public on purpose; anonymous visitors see only curated spots.
 - Authorization is enforced in the application; PostgreSQL row-level security isn't used.
 
 ---
 
 ## 11. Testing
 
-### Automated tests (37 passing)
+### Automated tests (50 passing)
 
 | File | Covers |
 |---|---|
@@ -505,6 +518,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 | `test_wind_matching.py` | Wind below, at, and above the limit; missing wind; no limit; paused |
 | `test_alert_ownership.py` | Login required; one user can't list, edit, pause, delete, or check another user's alerts |
 | `test_alert_history.py` | The owner sees history; other users get 404; login required |
+| `test_local_breaks.py` | Breaks are private (other users and anonymous visitors can't see, forecast, use, or delete them); 3-per-user limit; deleting frees a slot; land points rejected; can't delete a break an alert uses; curated spots can't be deleted; add attempts rate-limited |
 | `test_security.py` | CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected. Security log: events recorded, no passwords or tokens |
 
 The tests run against an in-memory SQLite database, so PostgreSQL-specific behavior such as `ON CONFLICT` is verified by running the real worker.
@@ -549,6 +563,13 @@ npm run dev
 ```
 
 Open the address Vite prints; if port 5173 is taken it picks another.
+
+**Surf spots** (adds any missing spots; safe to rerun)
+
+```bash
+cd ~/Projects/surf-alerts/backend && source .venv/bin/activate
+python -m app.seed
+```
 
 **Worker**
 
@@ -608,6 +629,8 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 | Per-account alerts | Every alert owned by a user and private to them | ✅ |
 | Alert History | Saved matches and email attempts per alert | ✅ |
 | Navigation | Side menu with Surf Spots, My Alerts, and Alert History pages | ✅ |
+| Surf spots | 17 Southern California breaks, search, region grouping | ✅ |
+| Local breaks | Up to 3 private breaks per user, on their own page | ✅ |
 | CSRF protection | Signed double-submit token | ✅ |
 | Rate limiting | Login and registration limits | ✅ |
 | Session hardening | Server-side revocation, security logging | ✅ |
@@ -709,4 +732,4 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 
 ---
 
-**Next:** More breaks, with search and region grouping, before deploying.
+**Next:** Deploy.

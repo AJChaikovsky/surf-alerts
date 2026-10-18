@@ -48,6 +48,52 @@ h2 {
   gap: 16px;
 }
 
+.spot-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 430px;
+  margin-bottom: 28px;
+}
+
+.spot-search label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.spot-search input {
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 14px;
+  color: #172b3a;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+}
+
+.spot-search input:focus-visible {
+  outline: 2px solid #0c7899;
+  outline-offset: 1px;
+}
+
+.spot-search-empty {
+  color: #64748b;
+}
+
+.spot-region {
+  margin-bottom: 32px;
+}
+
+.spot-region-heading {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
 .spot-card {
   background: white;
   padding: 24px;
@@ -83,6 +129,7 @@ h2 {
 /* Forecast section */
 
 .forecast-section {
+  scroll-margin-top: 16px;
   margin-top: 40px;
 }
 

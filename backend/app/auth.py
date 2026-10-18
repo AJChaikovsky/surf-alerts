@@ -349,6 +349,25 @@ def get_current_user(
     return user
 
 
+def get_optional_user(
+    request: Request,
+    token: str | None = Cookie(
+        default=None,
+        alias=COOKIE_NAME
+    ),
+    db: Session = Depends(get_db)
+) -> User | None:
+    # For public routes that show more to a signed-in user.
+    if not token:
+        return None
+
+    try:
+        return get_current_user(request, token, db)
+
+    except HTTPException:
+        return None
+
+
 # -------- REGISTER --------
 
 @router.post(

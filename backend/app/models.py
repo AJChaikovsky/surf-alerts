@@ -113,6 +113,18 @@ class SurfSpot(Base):
         nullable=False
     )
 
+    # NULL for curated spots everyone sees; set for a user's
+    # private local break.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True
+    )
+
+    @property
+    def is_custom(self) -> bool:
+        return self.user_id is not None
+
 
 class Alert(Base):
     __tablename__ = "alerts"

@@ -1,0 +1,60 @@
+/* Most styles come from the shared form and card classes in index.css. */
+
+.lb-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lb-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* -------- WAVE DATA FOUND FOR A NEW BREAK -------- */
+
+.lb-found {
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  background: #eaf6fa;
+  border: 1px solid #c4e7ef;
+  border-radius: 10px;
+}
+
+.lb-found-title {
+  margin: 0 0 12px;
+  font-weight: 700;
+}
+
+.lb-found-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 10px;
+}
+
+.lb-found-values dt {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.lb-found-values dd {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #087695;
+}
+
+.lb-found small {
+  color: #64748b;
+}
+
+@media (max-width: 480px) {
+  .lb-found-values {
+    grid-template-columns: 1fr;
+  }
+}

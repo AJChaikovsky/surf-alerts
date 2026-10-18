@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import Dashboard from "./Dashboard";
 import AlertHistory from "./components/AlertHistory";
+import LocalBreaks from "./components/LocalBreaks";
 import SideNav, { type Page } from "./components/SideNav";
 import { apiFetch, SESSION_EXPIRED_EVENT } from "./api";
 
@@ -22,7 +23,7 @@ type AuthStatus =
 function pageFromHash(): Page {
   const page = window.location.hash.replace("#/", "");
 
-  return page === "alerts" || page === "history"
+  return page === "breaks" || page === "alerts" || page === "history"
     ? page
     : "spots";
 }
@@ -263,6 +264,8 @@ function App() {
             <div className="history-page">
               <AlertHistory />
             </div>
+          ) : page === "breaks" ? (
+            <LocalBreaks />
           ) : (
             <Dashboard view={page} />
           )}
