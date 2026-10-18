@@ -471,6 +471,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 
 ### Email rules
 
+- Each email covers one alert and one surf day. It lists the matching hours (the first six, then a count) and the **average wave height, swell period, and wind speed** across those hours. Hours missing a value are left out of that average, and a value missing from every hour shows as N/A.
 - Emails always go to the alert owner's account email.
 - `EMAIL_NOTIFICATIONS_ENABLED=false`, the default, means dry run.
 - `sent` means Resend **accepted** the message, not that it reached the inbox.
@@ -508,7 +509,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 
 ## 11. Testing
 
-### Automated tests (50 passing)
+### Automated tests (56 passing)
 
 | File | Covers |
 |---|---|
@@ -519,6 +520,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 | `test_alert_ownership.py` | Login required; one user can't list, edit, pause, delete, or check another user's alerts |
 | `test_alert_history.py` | The owner sees history; other users get 404; login required |
 | `test_local_breaks.py` | Breaks are private (other users and anonymous visitors can't see, forecast, use, or delete them); 3-per-user limit; deleting frees a slot; land points rejected; can't delete a break an alert uses; curated spots can't be deleted; add attempts rate-limited |
+| `test_notification_email.py` | Email averages for waves, swell period, and wind; missing values skipped or shown as N/A; hour list truncation; HTML escaping |
 | `test_security.py` | CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected. Security log: events recorded, no passwords or tokens |
 
 The tests run against an in-memory SQLite database, so PostgreSQL-specific behavior such as `ON CONFLICT` is verified by running the real worker.

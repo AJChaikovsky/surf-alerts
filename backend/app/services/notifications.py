@@ -54,6 +54,67 @@ def group_matches_by_day(matches: list[dict]):
     )
 
 
+# -------- EMAIL CONTENT --------
+
+def average(entries, field: str) -> float | None:
+    # Average over the hours that have this value; None if none do.
+    values = [
+        match[field]
+        for _, match in entries
+        if match.get(field) is not None
+    ]
+
+    return sum(values) / len(values) if values else None
+
+
+def format_average(value: float | None, unit: str) -> str:
+    return "N/A" if value is None else f"{value:.1f} {unit}"
+
+
+def build_email(alert, spot, surf_date, entries) -> tuple[str, str]:
+    """Return (subject, html) for one alert's matches on one surf day."""
+    hours = ", ".join(
+        local.strftime("%I:%M %p").lstrip("0")
+        for local, _ in entries[:6]
+    )
+
+    if len(entries) > 6:
+        hours += f" and {len(entries) - 6} more"
+
+    day = f"{surf_date:%A, %B} {surf_date.day}"
+
+    averages = [
+        ("Average wave height", format_average(average(entries, "wave_height_ft"), "ft")),
+        ("Average swell period", format_average(average(entries, "swell_period_s"), "s")),
+        ("Average wind speed", format_average(average(entries, "wind_speed_kn"), "kn")),
+    ]
+
+    rows = "".join(
+        f"<tr><td style=\"padding:4px 16px 4px 0;color:#64748b\">{label}</td>"
+        f"<td style=\"padding:4px 0;font-weight:bold\">{value}</td></tr>"
+        for label, value in averages
+    )
+
+    subject = (
+        f"Surf Alerts: {spot.name} conditions "
+        f"on {surf_date.isoformat()}"
+    )
+
+    html = (
+        f"<h2>{escape(alert.name)}</h2>"
+        f"<p>Matching surf conditions at "
+        f"{escape(spot.name)} on {day}.</p>"
+        f"<p><strong>Matching hours ({len(entries)}):</strong> "
+        f"{escape(hours)}</p>"
+        "<p><strong>Forecast averages across those hours:</strong></p>"
+        f"<table style=\"border-collapse:collapse\">{rows}</table>"
+        "<p>Marine forecasts are estimates. "
+        "Check local conditions before surfing.</p>"
+    )
+
+    return subject, html
+
+
 # -------- SEND OWNER-SPECIFIC NOTIFICATIONS --------
 
 async def notify_matching_hours(
@@ -139,24 +200,11 @@ async def notify_matching_hours(
 
         attempted += 1
 
-        hours = ", ".join(
-            local.strftime("%I:%M %p").lstrip("0")
-            for local, _ in entries[:6]
-        )
-
-        subject = (
-            f"Surf Alerts: {spot.name} conditions "
-            f"on {surf_date.isoformat()}"
-        )
-
-        html = (
-            f"<h2>{escape(alert.name)}</h2>"
-            f"<p>Matching surf conditions at "
-            f"{escape(spot.name)} "
-            f"on {surf_date.isoformat()}.</p>"
-            f"<p>Forecast hours: {escape(hours)}</p>"
-            "<p>Marine forecasts are estimates. "
-            "Check local conditions before surfing.</p>"
+        subject, html = build_email(
+            alert,
+            spot,
+            surf_date,
+            entries
         )
 
         try:
