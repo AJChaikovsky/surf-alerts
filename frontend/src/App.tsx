@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 
 import Dashboard from "./Dashboard";
+import AlertHistory from "./components/AlertHistory";
 
 import AuthPage, {
   type AuthenticatedUser,
@@ -207,7 +208,11 @@ function App() {
         </p>
       )}
 
+      {/* Existing surf dashboard */}
       <Dashboard />
+
+      {/* History and notification tracking */}
+      <AlertHistory />
     </>
   );
 }

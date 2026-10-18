@@ -1,0 +1,294 @@
+/* -------- ALERT HISTORY SECTION -------- */
+
+.ah-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px 64px;
+  color: #172b3a;
+}
+
+.ah-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.ah-section-header h2 {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.ah-section-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ah-refresh-button {
+  background: white;
+  color: #087695;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ah-refresh-button:hover {
+  background: #eaf6fa;
+}
+
+.ah-refresh-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* -------- ALERT SELECTOR -------- */
+
+.ah-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-width: 430px;
+  margin-bottom: 20px;
+}
+
+.ah-selector label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ah-selector select {
+  width: 100%;
+  background: white;
+  color: #172b3a;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font-size: 14px;
+}
+
+/* -------- SELECTED ALERT -------- */
+
+.ah-selected-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: #eaf6fa;
+  border: 1px solid #c4e7ef;
+}
+
+.ah-selected-alert h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.ah-selected-alert p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.ah-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ah-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ah-dot.active {
+  background-color: #22c55e;
+}
+
+.ah-dot.paused {
+  background-color: #f59e0b;
+}
+
+/* -------- TWO HISTORY PANELS -------- */
+
+.ah-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.ah-panel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 22px;
+  min-width: 0;
+}
+
+.ah-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ah-panel-heading h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.ah-count {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* -------- HISTORY RECORDS -------- */
+
+.ah-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ah-event {
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.ah-event-top {
+  margin-bottom: 10px;
+}
+
+.ah-event p {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+
+.ah-delivery-status {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ah-sent {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ah-failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.ah-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ah-match-label {
+  display: inline-block;
+  color: #087695;
+  background: #dff3fa;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* -------- EMPTY AND ERROR STATES -------- */
+
+.ah-empty,
+.ah-empty-small {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 22px;
+}
+
+.ah-empty p,
+.ah-empty-small p {
+  margin: 0 0 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.ah-empty span,
+.ah-empty-small span {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.ah-muted {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.ah-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 13px 16px;
+  border-radius: 9px;
+  margin: 16px 0;
+}
+
+.ah-footnote {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-top: 22px;
+}
+
+/* -------- MOBILE -------- */
+
+@media (max-width: 800px) {
+  .ah-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .ah-section {
+    padding: 16px 16px 48px;
+  }
+
+  .ah-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ah-refresh-button {
+    width: 100%;
+  }
+
+  .ah-selected-alert {
+    padding: 16px;
+  }
+
+  .ah-panel {
+    padding: 16px;
+  }
+}

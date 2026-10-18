@@ -352,6 +352,74 @@ def edit_alert(
     return alert
 
 
+# -------- VIEW MY ALERT HISTORY --------
+
+HISTORY_LIMIT = 20
+
+
+@app.get("/alerts/{alert_id}/history")
+def get_alert_history(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    alert = owned_alert(
+        db,
+        alert_id,
+        current_user.id
+    )
+
+    spot = db.get(
+        SurfSpot,
+        alert.spot_id
+    )
+
+    matches = db.scalars(
+        select(AlertMatch)
+        .where(AlertMatch.alert_id == alert.id)
+        .order_by(
+            AlertMatch.detected_at.desc(),
+            AlertMatch.id.desc()
+        )
+        .limit(HISTORY_LIMIT)
+    ).all()
+
+    deliveries = db.scalars(
+        select(NotificationDelivery)
+        .where(NotificationDelivery.alert_id == alert.id)
+        .order_by(
+            NotificationDelivery.created_at.desc(),
+            NotificationDelivery.id.desc()
+        )
+        .limit(HISTORY_LIMIT)
+    ).all()
+
+    return {
+        "alert_id": alert.id,
+        "alert_name": alert.name,
+        "spot": spot.name if spot else None,
+        "matches": [
+            {
+                "id": match.id,
+                "forecast_time": match.forecast_time,
+                "detected_at": match.detected_at,
+            }
+            for match in matches
+        ],
+        "deliveries": [
+            {
+                "id": delivery.id,
+                "surf_date": delivery.surf_date,
+                "recipient": delivery.recipient,
+                "status": delivery.status,
+                "created_at": delivery.created_at,
+                "sent_at": delivery.sent_at,
+            }
+            for delivery in deliveries
+        ],
+    }
+
+
 # -------- DELETE MY ALERT --------
 
 @app.delete(
