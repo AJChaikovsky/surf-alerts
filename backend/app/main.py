@@ -1,15 +1,25 @@
+
 from fastapi import Depends, FastAPI, HTTPException
+
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth import (
+    get_current_user,
+    router as auth_router,
+)
+
 from app.database import get_db
+
 from app.models import (
     Alert,
     AlertMatch,
     NotificationDelivery,
     SurfSpot,
+    User,
 )
+
 from app.schemas import (
     AlertCreate,
     AlertResponse,
@@ -17,16 +27,41 @@ from app.schemas import (
     SurfSpotCreate,
     SurfSpotResponse,
 )
+
 from app.services.forecast import (
     format_forecast,
     get_forecast,
 )
+
 from app.services.matching import find_matching_hours
-from app.auth import router as auth_router
 
 
 app = FastAPI(title="Surf Alerts API")
 app.include_router(auth_router)
+
+
+# -------- CHECK ALERT OWNERSHIP --------
+
+def owned_alert(
+    db: Session,
+    alert_id: int,
+    user_id: int
+) -> Alert:
+    alert = db.scalar(
+        select(Alert).where(
+            Alert.id == alert_id,
+            Alert.user_id == user_id
+        )
+    )
+
+    if alert is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Alert not found"
+        )
+
+    return alert
+
 
 # -------- HOME / HEALTH --------
 
@@ -43,7 +78,10 @@ def health():
 # -------- FORECAST ENDPOINTS --------
 
 @app.get("/forecast")
-async def forecast(latitude: float, longitude: float):
+async def forecast(
+    latitude: float,
+    longitude: float
+):
     return await get_forecast(latitude, longitude)
 
 
@@ -52,7 +90,10 @@ async def forecast_summary(
     latitude: float,
     longitude: float
 ):
-    raw_data = await get_forecast(latitude, longitude)
+    raw_data = await get_forecast(
+        latitude,
+        longitude
+    )
 
     return {
         "location": {
@@ -69,7 +110,9 @@ async def forecast_summary(
     "/spots",
     response_model=list[SurfSpotResponse]
 )
-def list_spots(db: Session = Depends(get_db)):
+def list_spots(
+    db: Session = Depends(get_db)
+):
     return db.scalars(
         select(SurfSpot).order_by(SurfSpot.id)
     ).all()
@@ -111,7 +154,8 @@ async def spot_forecast(
 )
 def create_spot(
     spot: SurfSpotCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     existing = db.scalar(
         select(SurfSpot).where(
@@ -131,6 +175,7 @@ def create_spot(
         db.add(new_spot)
         db.commit()
         db.refresh(new_spot)
+
     except IntegrityError:
         db.rollback()
         raise HTTPException(
@@ -150,9 +195,13 @@ def create_spot(
 )
 def create_alert(
     alert: AlertCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    spot = db.get(SurfSpot, alert.spot_id)
+    spot = db.get(
+        SurfSpot,
+        alert.spot_id
+    )
 
     if spot is None:
         raise HTTPException(
@@ -160,7 +209,10 @@ def create_alert(
             detail="Surf spot not found"
         )
 
-    new_alert = Alert(**alert.model_dump())
+    new_alert = Alert(
+        **alert.model_dump(),
+        user_id=current_user.id
+    )
 
     db.add(new_alert)
     db.commit()
@@ -169,34 +221,41 @@ def create_alert(
     return new_alert
 
 
-# -------- LIST ALERTS --------
+# -------- LIST MY ALERTS --------
 
 @app.get(
     "/alerts",
     response_model=list[AlertResponse]
 )
-def list_alerts(db: Session = Depends(get_db)):
+def list_alerts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     return db.scalars(
-        select(Alert).order_by(Alert.id)
+        select(Alert)
+        .where(Alert.user_id == current_user.id)
+        .order_by(Alert.id)
     ).all()
 
 
-# -------- FIND MATCHING FORECAST HOURS --------
+# -------- VIEW MY ALERT MATCHES --------
 
 @app.get("/alerts/{alert_id}/matches")
 async def get_alert_matches(
     alert_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    alert = db.get(Alert, alert_id)
+    alert = owned_alert(
+        db,
+        alert_id,
+        current_user.id
+    )
 
-    if alert is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Alert not found"
-        )
-
-    spot = db.get(SurfSpot, alert.spot_id)
+    spot = db.get(
+        SurfSpot,
+        alert.spot_id
+    )
 
     if spot is None:
         raise HTTPException(
@@ -209,7 +268,9 @@ async def get_alert_matches(
         spot.longitude
     )
 
-    formatted_data = format_forecast(raw_data)
+    formatted_data = format_forecast(
+        raw_data
+    )
 
     matches = find_matching_hours(
         formatted_data,
@@ -225,7 +286,7 @@ async def get_alert_matches(
     }
 
 
-# -------- PAUSE / REACTIVATE ALERT --------
+# -------- PAUSE / REACTIVATE --------
 
 @app.patch(
     "/alerts/{alert_id}",
@@ -234,15 +295,14 @@ async def get_alert_matches(
 def update_alert_status(
     alert_id: int,
     update: AlertStatusUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    alert = db.get(Alert, alert_id)
-
-    if alert is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Alert not found"
-        )
+    alert = owned_alert(
+        db,
+        alert_id,
+        current_user.id
+    )
 
     alert.is_active = update.is_active
 
@@ -252,7 +312,7 @@ def update_alert_status(
     return alert
 
 
-# -------- EDIT ALERT --------
+# -------- EDIT MY ALERT --------
 
 @app.put(
     "/alerts/{alert_id}",
@@ -261,17 +321,19 @@ def update_alert_status(
 def edit_alert(
     alert_id: int,
     update: AlertCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    alert = db.get(Alert, alert_id)
+    alert = owned_alert(
+        db,
+        alert_id,
+        current_user.id
+    )
 
-    if alert is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Alert not found"
-        )
-
-    spot = db.get(SurfSpot, update.spot_id)
+    spot = db.get(
+        SurfSpot,
+        update.spot_id
+    )
 
     if spot is None:
         raise HTTPException(
@@ -282,13 +344,15 @@ def edit_alert(
     for field, value in update.model_dump().items():
         setattr(alert, field, value)
 
+    # user_id cannot be changed through this endpoint.
+
     db.commit()
     db.refresh(alert)
 
     return alert
 
 
-# -------- DELETE ALERT --------
+# -------- DELETE MY ALERT --------
 
 @app.delete(
     "/alerts/{alert_id}",
@@ -296,27 +360,24 @@ def edit_alert(
 )
 def delete_alert(
     alert_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    alert = db.get(Alert, alert_id)
+    alert = owned_alert(
+        db,
+        alert_id,
+        current_user.id
+    )
 
-    if alert is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Alert not found"
-        )
-
-    # Delete related forecast matches
     db.execute(
         delete(AlertMatch).where(
-            AlertMatch.alert_id == alert_id
+            AlertMatch.alert_id == alert.id
         )
     )
 
-    # Delete notification delivery records
     db.execute(
         delete(NotificationDelivery).where(
-            NotificationDelivery.alert_id == alert_id
+            NotificationDelivery.alert_id == alert.id
         )
     )
 

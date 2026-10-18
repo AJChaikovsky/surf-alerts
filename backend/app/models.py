@@ -1,3 +1,4 @@
+
 from datetime import date, datetime
 
 from sqlalchemy import (
@@ -16,8 +17,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
-
-# -------- USERS --------
 
 class User(Base):
     __tablename__ = "users"
@@ -45,8 +44,6 @@ class User(Base):
         nullable=False
     )
 
-
-# -------- SURF SPOTS --------
 
 class SurfSpot(Base):
     __tablename__ = "surf_spots"
@@ -83,8 +80,6 @@ class SurfSpot(Base):
     )
 
 
-# -------- ALERTS --------
-
 class Alert(Base):
     __tablename__ = "alerts"
 
@@ -98,6 +93,12 @@ class Alert(Base):
     id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True
     )
 
     name: Mapped[str] = mapped_column(
@@ -138,8 +139,6 @@ class Alert(Base):
     )
 
 
-# -------- MATCHED FORECAST HOURS --------
-
 class AlertMatch(Base):
     __tablename__ = "alert_matches"
 
@@ -172,8 +171,6 @@ class AlertMatch(Base):
         nullable=False
     )
 
-
-# -------- NOTIFICATION DELIVERIES --------
 
 class NotificationDelivery(Base):
     __tablename__ = "notification_deliveries"

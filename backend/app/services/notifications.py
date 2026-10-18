@@ -1,36 +1,60 @@
+
+import logging
 import os
+
 from collections import defaultdict
 from datetime import datetime, timezone
 from html import escape
 from zoneinfo import ZoneInfo
 
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import (
+    insert as pg_insert,
+)
 
 from app.database import SessionLocal
-from app.models import NotificationDelivery
+
+from app.models import (
+    NotificationDelivery,
+    User,
+)
+
 from app.services.email import send_email
 
 
-SURF_TIMEZONE = ZoneInfo("America/Los_Angeles")
+logger = logging.getLogger(__name__)
 
+PACIFIC = ZoneInfo("America/Los_Angeles")
+
+
+# -------- GROUP MATCHES BY LOCAL SURF DATE --------
 
 def group_matches_by_day(matches: list[dict]):
-    """Group UTC forecast hours by California surf date."""
     grouped = defaultdict(list)
 
-    for hour in matches:
-        utc_time = datetime.fromisoformat(
-            hour["time"]
-        ).replace(tzinfo=timezone.utc)
-
-        local_time = utc_time.astimezone(SURF_TIMEZONE)
-
-        grouped[local_time.date()].append(
-            (local_time, hour)
+    for match in matches:
+        timestamp = datetime.fromisoformat(
+            match["time"].replace("Z", "+00:00")
         )
 
-    return sorted(grouped.items())
+        if timestamp.tzinfo is None:
+            # The monitoring worker requests UTC forecasts.
+            timestamp = timestamp.replace(
+                tzinfo=timezone.utc
+            )
 
+        local_time = timestamp.astimezone(PACIFIC)
+
+        grouped[local_time.date()].append(
+            (local_time, match)
+        )
+
+    return sorted(
+        grouped.items(),
+        key=lambda item: item[0]
+    )
+
+
+# -------- SEND OWNER-SPECIFIC NOTIFICATIONS --------
 
 async def notify_matching_hours(
     alert,
@@ -38,140 +62,162 @@ async def notify_matching_hours(
     matches: list[dict],
     send_budget: int = 1
 ) -> int:
-    """Send at most one email per alert per surf day."""
+    """
+    Send notifications to the alert owner.
 
-    if not matches:
+    Return the number of email attempts made.
+    Each alert may be notified once per surf day.
+    """
+
+    if not matches or send_budget <= 0:
         return 0
 
     enabled = (
         os.getenv(
-            "EMAIL_NOTIFICATIONS_ENABLED", "false"
+            "EMAIL_NOTIFICATIONS_ENABLED",
+            "false"
         ).lower() == "true"
     )
 
-    if enabled and send_budget <= 0:
+    # Look up the owner from PostgreSQL.
+    with SessionLocal() as db:
+        user = db.get(
+            User,
+            alert.user_id
+        )
+
+        if user is None:
+            logger.error(
+                "Alert %s has no valid owner",
+                alert.id
+            )
+            return 0
+
+        recipient = user.email
+
+    # Keep emails disabled while testing ownership.
+    if not enabled:
+        logger.info(
+            "DRY RUN: alert %s would email account %s",
+            alert.id,
+            recipient
+        )
         return 0
 
-    attempts = 0
-    grouped_days = group_matches_by_day(matches)
+    attempted = 0
 
-    for surf_date, entries in grouped_days:
-        if enabled and attempts >= send_budget:
+    for surf_date, entries in group_matches_by_day(matches):
+        if attempted >= send_budget:
             break
 
-        entries = sorted(entries, key=lambda item: item[0])
-
-        first_time, first_hour = entries[0]
-
-        subject = (
-            f"Surf Alert: {spot.name} - "
-            f"{surf_date.isoformat()}"
-        )
-
-        safe_spot = escape(spot.name)
-        safe_alert = escape(alert.name)
-
-        html = f"""
-        <h2>Good surf conditions are forecasted!</h2>
-
-        <p>Your alert <strong>{safe_alert}</strong>
-        has matching conditions at
-        <strong>{safe_spot}</strong>.</p>
-
-        <p><strong>Date:</strong> {surf_date}</p>
-
-        <p><strong>First matching hour:</strong>
-        {first_time.strftime('%I:%M %p')} Pacific</p>
-
-        <p><strong>Wave height:</strong>
-        {first_hour['wave_height_ft']} ft</p>
-
-        <p><strong>Swell period:</strong>
-        {first_hour['swell_period_s']} seconds</p>
-
-        <p><strong>Matching forecast hours:</strong>
-        {len(entries)}</p>
-
-        <p><small>These are offshore model forecasts,
-        not exact breaking-wave heights.</small></p>
-        """
-
-        # Preview without sending or writing to database
-        if not enabled:
-            print(
-                f"DRY RUN: Would email '{subject}' "
-                f"({len(entries)} matching hours)",
-                flush=True
+        # Reserve this alert/day before sending.
+        # PostgreSQL prevents duplicate reservations.
+        with SessionLocal() as db:
+            statement = (
+                pg_insert(NotificationDelivery)
+                .values(
+                    alert_id=alert.id,
+                    surf_date=surf_date,
+                    recipient=recipient,
+                    status="pending"
+                )
+                .on_conflict_do_nothing(
+                    index_elements=[
+                        "alert_id",
+                        "surf_date"
+                    ]
+                )
+                .returning(NotificationDelivery.id)
             )
-            continue
 
-        recipient = os.environ["TEST_EMAIL_TO"]
-
-        # Claim the notification before sending
-        statement = (
-            insert(NotificationDelivery)
-            .values(
-                alert_id=alert.id,
-                surf_date=surf_date,
-                recipient=recipient,
-                status="pending"
-            )
-            .on_conflict_do_nothing(
-                constraint="uq_notification_alert_date"
-            )
-            .returning(NotificationDelivery.id)
-        )
-
-        with SessionLocal.begin() as db:
             delivery_id = db.scalar(statement)
+            db.commit()
 
-        # Already attempted for this alert and surf day
+        # Already notified or attempted for this surf day.
         if delivery_id is None:
             continue
 
-        attempts += 1
+        attempted += 1
+
+        hours = ", ".join(
+            local.strftime("%I:%M %p").lstrip("0")
+            for local, _ in entries[:6]
+        )
+
+        subject = (
+            f"Surf Alerts: {spot.name} conditions "
+            f"on {surf_date.isoformat()}"
+        )
+
+        html = (
+            f"<h2>{escape(alert.name)}</h2>"
+            f"<p>Matching surf conditions at "
+            f"{escape(spot.name)} "
+            f"on {surf_date.isoformat()}.</p>"
+            f"<p>Forecast hours: {escape(hours)}</p>"
+            "<p>Marine forecasts are estimates. "
+            "Check local conditions before surfing.</p>"
+        )
 
         try:
-            response = await send_email(
+            result = await send_email(
                 to=recipient,
                 subject=subject,
                 html=html
             )
 
-            message_id = (
-                response.get("id")
-                if isinstance(response, dict)
-                else getattr(response, "id", None)
-            )
+            provider_id = None
 
-            if not message_id:
-                raise ValueError(
-                    "Resend returned no message ID"
+            if isinstance(result, dict):
+                provider_id = result.get("id")
+
+            elif result is not None:
+                provider_id = getattr(
+                    result,
+                    "id",
+                    None
                 )
 
-            with SessionLocal.begin() as db:
+            with SessionLocal() as db:
                 delivery = db.get(
-                    NotificationDelivery, delivery_id
+                    NotificationDelivery,
+                    delivery_id
                 )
-                delivery.status = "sent"
-                delivery.provider_message_id = message_id
-                delivery.sent_at = datetime.now(timezone.utc)
 
-            print(
-                f"EMAIL SENT: {subject}",
-                flush=True
+                if delivery is not None:
+                    delivery.status = "sent"
+
+                    delivery.provider_message_id = (
+                        str(provider_id)
+                        if provider_id is not None
+                        else None
+                    )
+
+                    delivery.sent_at = datetime.now(
+                        timezone.utc
+                    )
+
+                    db.commit()
+
+            logger.info(
+                "Sent alert %s to its owner",
+                alert.id
             )
 
-        except Exception as exc:
-            with SessionLocal.begin() as db:
+        except Exception:
+            logger.exception(
+                "Notification failed for alert %s",
+                alert.id
+            )
+
+            with SessionLocal() as db:
                 delivery = db.get(
-                    NotificationDelivery, delivery_id
+                    NotificationDelivery,
+                    delivery_id
                 )
-                delivery.status = "failed"
 
-            print(
-                f"EMAIL FAILED: {subject}: {exc}",
-                flush=True
-            )
+                if delivery is not None:
+                    delivery.status = "failed"
+                    db.commit()
 
-    return attempts
+    return attempted
