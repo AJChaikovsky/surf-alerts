@@ -1,69 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import Base, get_db
 from app.main import app
-from app.models import SurfSpot
-
-
-# -------- TEST DATABASE --------
-# In-memory SQLite, so these tests never touch the real surf_alerts data.
-
-@pytest.fixture
-def db_session_factory():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool
-    )
-
-    Base.metadata.create_all(engine)
-
-    TestSession = sessionmaker(bind=engine, autoflush=False)
-
-    with TestSession() as db:
-        db.add(
-            SurfSpot(
-                slug="el-porto",
-                name="El Porto",
-                latitude=33.89,
-                longitude=-118.42,
-                region="South Bay"
-            )
-        )
-        db.commit()
-
-    def override_get_db():
-        db = TestSession()
-
-        try:
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    yield TestSession
-
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-def make_user_client(email: str) -> TestClient:
-    # Each client keeps its own session cookie, like a separate browser.
-    client = TestClient(app)
-
-    response = client.post(
-        "/auth/register",
-        json={"email": email, "password": "password123"}
-    )
-
-    assert response.status_code == 201
-
-    return client
 
 
 def alert_payload(name: str) -> dict:
@@ -77,7 +15,7 @@ def alert_payload(name: str) -> dict:
 
 
 @pytest.fixture
-def owner_and_intruder(db_session_factory):
+def owner_and_intruder(db_session_factory, make_user_client):
     owner = make_user_client("owner@example.com")
     intruder = make_user_client("intruder@example.com")
 

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import ForecastCard, {
   type ForecastHour,
 } from "./components/ForecastCard";
+import { csrfHeaders } from "./api";
 
 export type DashboardView = "spots" | "alerts";
 
@@ -255,6 +256,7 @@ function App({ view }: { view: DashboardView }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...csrfHeaders(),
         },
         body: JSON.stringify(
           makeAlertPayload(createValues, true)
@@ -293,6 +295,7 @@ function App({ view }: { view: DashboardView }) {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          ...csrfHeaders(),
         },
         body: JSON.stringify({
           is_active: !alert.is_active,
@@ -360,6 +363,7 @@ function App({ view }: { view: DashboardView }) {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          ...csrfHeaders(),
         },
         body: JSON.stringify(
           makeAlertPayload(editValues, alert.is_active)
@@ -395,6 +399,7 @@ function App({ view }: { view: DashboardView }) {
     try {
       const response = await fetch(`/api/alerts/${alertId}`, {
         method: "DELETE",
+        headers: csrfHeaders(),
       });
 
       if (!response.ok) {

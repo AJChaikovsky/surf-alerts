@@ -1,11 +1,13 @@
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import (
+    csrf_is_valid,
     get_current_user,
     router as auth_router,
 )
@@ -38,6 +40,21 @@ from app.services.matching import find_matching_hours
 
 app = FastAPI(title="Surf Alerts API")
 app.include_router(auth_router)
+
+
+# -------- CSRF PROTECTION --------
+
+@app.middleware("http")
+async def require_csrf_token(request: Request, call_next):
+    # Reject state-changing requests that don't echo
+    # the CSRF cookie back in the X-CSRF-Token header.
+    if not csrf_is_valid(request):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Invalid or missing CSRF token"}
+        )
+
+    return await call_next(request)
 
 
 # -------- CHECK ALERT OWNERSHIP --------

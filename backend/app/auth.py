@@ -1,4 +1,10 @@
+import hashlib
+import hmac
+import math
 import os
+import threading
+import time
+from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -9,6 +15,7 @@ from fastapi import (
     Cookie,
     Depends,
     HTTPException,
+    Request,
     Response,
     status,
 )
@@ -38,6 +45,23 @@ if not JWT_SECRET_KEY or len(JWT_SECRET_KEY) < 32:
 JWT_ALGORITHM = "HS256"
 
 COOKIE_NAME = "surf_session"
+
+# Readable by the frontend, which echoes it back in a header.
+CSRF_COOKIE_NAME = "csrf_token"
+CSRF_HEADER_NAME = "X-CSRF-Token"
+
+# No session exists yet when these are called.
+CSRF_EXEMPT_PATHS = {"/auth/login", "/auth/register"}
+
+UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+# Failed logins per email + IP, and per IP across all emails.
+LOGIN_MAX_FAILURES = 5
+LOGIN_MAX_FAILURES_PER_IP = 20
+LOGIN_WINDOW_SECONDS = 15 * 60
+
+REGISTER_MAX_ATTEMPTS = 10
+REGISTER_WINDOW_SECONDS = 60 * 60
 
 SESSION_DAYS = 7
 
@@ -99,6 +123,31 @@ def create_session_token(user_id: int) -> str:
     )
 
 
+def csrf_token_for(session_token: str) -> str:
+    # Signed double-submit: the CSRF token is derived from
+    # the session, so it can't be reused with another session.
+    return hmac.new(
+        JWT_SECRET_KEY.encode(),
+        session_token.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+
+def set_csrf_cookie(
+    response: Response,
+    session_token: str
+):
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=csrf_token_for(session_token),
+        httponly=False,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=SESSION_DAYS * 24 * 60 * 60,
+        path="/"
+    )
+
+
 def set_session_cookie(
     response: Response,
     user_id: int
@@ -114,6 +163,82 @@ def set_session_cookie(
         max_age=SESSION_DAYS * 24 * 60 * 60,
         path="/"
     )
+
+    set_csrf_cookie(response, token)
+
+
+def csrf_is_valid(request: Request) -> bool:
+    if request.method not in UNSAFE_METHODS:
+        return True
+
+    if request.url.path in CSRF_EXEMPT_PATHS:
+        return True
+
+    session_token = request.cookies.get(COOKIE_NAME)
+
+    # Without a session the endpoint itself returns 401.
+    if not session_token:
+        return True
+
+    sent_token = request.headers.get(CSRF_HEADER_NAME, "")
+
+    return hmac.compare_digest(
+        sent_token,
+        csrf_token_for(session_token)
+    )
+
+
+# -------- RATE LIMITING --------
+# In-memory, so limits are per API process. Multiple
+# instances in production would need a shared store.
+
+_attempts: dict[str, deque[float]] = defaultdict(deque)
+_attempts_lock = threading.Lock()
+
+
+def _recent_attempts(key: str, window: int) -> deque[float]:
+    attempts = _attempts[key]
+    cutoff = time.monotonic() - window
+
+    while attempts and attempts[0] < cutoff:
+        attempts.popleft()
+
+    return attempts
+
+
+def check_rate_limit(key: str, limit: int, window: int):
+    with _attempts_lock:
+        attempts = _recent_attempts(key, window)
+
+        if len(attempts) < limit:
+            return
+
+        retry_after = attempts[0] + window - time.monotonic()
+
+    raise HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many attempts. Please try again later.",
+        headers={"Retry-After": str(max(1, math.ceil(retry_after)))}
+    )
+
+
+def record_attempt(key: str):
+    with _attempts_lock:
+        _attempts[key].append(time.monotonic())
+
+
+def clear_attempts(key: str):
+    with _attempts_lock:
+        _attempts.pop(key, None)
+
+
+def reset_rate_limits():
+    with _attempts_lock:
+        _attempts.clear()
+
+
+def client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 
 
 def get_current_user(
@@ -172,9 +297,19 @@ def get_current_user(
 )
 def register(
     account: RegisterRequest,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db)
 ):
+    register_key = f"register:{client_ip(request)}"
+
+    check_rate_limit(
+        register_key,
+        REGISTER_MAX_ATTEMPTS,
+        REGISTER_WINDOW_SECONDS
+    )
+    record_attempt(register_key)
+
     email = normalize_email(str(account.email))
 
     existing = db.scalar(
@@ -219,11 +354,27 @@ def register(
 )
 def login(
     credentials: LoginRequest,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db)
 ):
     email = normalize_email(
         str(credentials.email)
+    )
+
+    ip = client_ip(request)
+    account_key = f"login:{ip}:{email}"
+    ip_key = f"login-ip:{ip}"
+
+    check_rate_limit(
+        account_key,
+        LOGIN_MAX_FAILURES,
+        LOGIN_WINDOW_SECONDS
+    )
+    check_rate_limit(
+        ip_key,
+        LOGIN_MAX_FAILURES_PER_IP,
+        LOGIN_WINDOW_SECONDS
     )
 
     user = db.scalar(
@@ -237,10 +388,15 @@ def login(
             user.password_hash
         )
     ):
+        record_attempt(account_key)
+        record_attempt(ip_key)
+
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
+
+    clear_attempts(account_key)
 
     set_session_cookie(response, user.id)
 
@@ -254,8 +410,14 @@ def login(
     response_model=UserResponse
 )
 def get_me(
+    response: Response,
+    token: str = Cookie(alias=COOKIE_NAME),
     current_user: User = Depends(get_current_user)
 ):
+    # Issue a CSRF cookie to sessions created before
+    # CSRF protection existed.
+    set_csrf_cookie(response, token)
+
     return current_user
 
 
@@ -268,6 +430,13 @@ def logout(response: Response):
         path="/",
         secure=COOKIE_SECURE,
         httponly=True,
+        samesite="lax"
+    )
+
+    response.delete_cookie(
+        key=CSRF_COOKIE_NAME,
+        path="/",
+        secure=COOKIE_SECURE,
         samesite="lax"
     )
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Dashboard from "./Dashboard";
 import AlertHistory from "./components/AlertHistory";
 import SideNav, { type Page } from "./components/SideNav";
+import { csrfHeaders } from "./api";
 
 import AuthPage, {
   type AuthenticatedUser,
@@ -128,6 +129,7 @@ function App() {
       const response = await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "same-origin",
+        headers: csrfHeaders(),
       });
 
       if (!response.ok) {

@@ -86,6 +86,12 @@ export default function AuthPage({
           );
         }
 
+        if (response.status === 429) {
+          throw new Error(
+            "Too many attempts. Please wait a few minutes and try again."
+          );
+        }
+
         if (response.status === 422) {
           throw new Error(
             "Please check your email and password."
