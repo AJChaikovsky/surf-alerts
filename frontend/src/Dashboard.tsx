@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import ForecastCard, {
   type ForecastHour,
 } from "./components/ForecastCard";
-import { csrfHeaders } from "./api";
+import { apiFetch } from "./api";
 
 export type DashboardView = "spots" | "alerts";
 
@@ -173,8 +173,8 @@ function App({ view }: { view: DashboardView }) {
     async function loadData() {
       try {
         const [spotsResponse, alertsResponse] = await Promise.all([
-          fetch("/api/spots"),
-          fetch("/api/alerts"),
+          apiFetch("/api/spots"),
+          apiFetch("/api/alerts"),
         ]);
 
         if (!spotsResponse.ok || !alertsResponse.ok) {
@@ -212,7 +212,7 @@ function App({ view }: { view: DashboardView }) {
     setForecastError("");
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/spots/${spot.slug}/forecast`
       );
 
@@ -252,11 +252,10 @@ function App({ view }: { view: DashboardView }) {
     setSavingAlert(true);
 
     try {
-      const response = await fetch("/api/alerts", {
+      const response = await apiFetch("/api/alerts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...csrfHeaders(),
         },
         body: JSON.stringify(
           makeAlertPayload(createValues, true)
@@ -291,11 +290,10 @@ function App({ view }: { view: DashboardView }) {
     setBusyAlertId(alert.id);
 
     try {
-      const response = await fetch(`/api/alerts/${alert.id}`, {
+      const response = await apiFetch(`/api/alerts/${alert.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...csrfHeaders(),
         },
         body: JSON.stringify({
           is_active: !alert.is_active,
@@ -359,11 +357,10 @@ function App({ view }: { view: DashboardView }) {
     setBusyAlertId(alert.id);
 
     try {
-      const response = await fetch(`/api/alerts/${alert.id}`, {
+      const response = await apiFetch(`/api/alerts/${alert.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          ...csrfHeaders(),
         },
         body: JSON.stringify(
           makeAlertPayload(editValues, alert.is_active)
@@ -397,9 +394,8 @@ function App({ view }: { view: DashboardView }) {
     setBusyAlertId(alertId);
 
     try {
-      const response = await fetch(`/api/alerts/${alertId}`, {
+      const response = await apiFetch(`/api/alerts/${alertId}`, {
         method: "DELETE",
-        headers: csrfHeaders(),
       });
 
       if (!response.ok) {

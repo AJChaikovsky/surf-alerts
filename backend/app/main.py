@@ -1,4 +1,6 @@
 
+import logging
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -7,9 +9,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import (
+    client_ip,
     csrf_is_valid,
     get_current_user,
     router as auth_router,
+    security_log,
 )
 
 from app.database import get_db
@@ -38,6 +42,13 @@ from app.services.forecast import (
 from app.services.matching import find_matching_hours
 
 
+# uvicorn only configures its own loggers; this makes
+# app loggers such as app.security visible too.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
+
 app = FastAPI(title="Surf Alerts API")
 app.include_router(auth_router)
 
@@ -49,6 +60,13 @@ async def require_csrf_token(request: Request, call_next):
     # Reject state-changing requests that don't echo
     # the CSRF cookie back in the X-CSRF-Token header.
     if not csrf_is_valid(request):
+        security_log.warning(
+            "csrf_rejected method=%s path=%s ip=%s",
+            request.method,
+            request.url.path,
+            client_ip(request)
+        )
+
         return JSONResponse(
             status_code=403,
             content={"detail": "Invalid or missing CSRF token"}

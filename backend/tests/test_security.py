@@ -1,8 +1,15 @@
+import logging
+from datetime import datetime, timedelta, timezone
+
+import jwt
 from fastapi.testclient import TestClient
 
 from app.auth import (
+    COOKIE_NAME,
     CSRF_COOKIE_NAME,
     CSRF_HEADER_NAME,
+    JWT_ALGORITHM,
+    JWT_SECRET_KEY,
     LOGIN_MAX_FAILURES,
     REGISTER_MAX_ATTEMPTS,
 )
@@ -147,3 +154,100 @@ def test_registration_is_rate_limited(db_session_factory):
     )
 
     assert response.status_code == 429
+
+
+# -------- SERVER-SIDE SESSIONS --------
+
+def client_with_session(token: str) -> TestClient:
+    client = TestClient(app)
+    client.cookies.set(COOKIE_NAME, token)
+    return client
+
+
+def test_logout_revokes_the_session_token(make_user_client):
+    client = make_user_client("revoke@example.com")
+    stolen_token = client.cookies[COOKIE_NAME]
+
+    assert client.post("/auth/logout").status_code == 200
+
+    # A copy of the token taken before logout no longer works.
+    attacker = client_with_session(stolen_token)
+
+    assert attacker.get("/auth/me").status_code == 401
+    assert attacker.get("/alerts").status_code == 401
+
+
+def test_logout_only_revokes_that_device(make_user_client):
+    laptop = make_user_client("devices@example.com")
+
+    phone = TestClient(app)
+    login(phone, "devices@example.com", "password123")
+
+    phone.headers[CSRF_HEADER_NAME] = phone.cookies[CSRF_COOKIE_NAME]
+    assert phone.post("/auth/logout").status_code == 200
+
+    assert laptop.get("/auth/me").status_code == 200
+
+
+def test_token_without_session_id_is_rejected(make_user_client):
+    make_user_client("legacy@example.com")
+
+    # Same shape as tokens issued before server-side sessions.
+    legacy_token = jwt.encode(
+        {
+            "sub": "1",
+            "exp": datetime.now(timezone.utc) + timedelta(days=1),
+            "type": "session",
+        },
+        JWT_SECRET_KEY,
+        algorithm=JWT_ALGORITHM
+    )
+
+    assert client_with_session(legacy_token).get("/auth/me").status_code == 401
+
+
+def test_token_with_unknown_session_id_is_rejected(make_user_client):
+    make_user_client("forged@example.com")
+
+    forged_token = jwt.encode(
+        {
+            "sub": "1",
+            "jti": "not-a-real-session",
+            "exp": datetime.now(timezone.utc) + timedelta(days=1),
+            "type": "session",
+        },
+        JWT_SECRET_KEY,
+        algorithm=JWT_ALGORITHM
+    )
+
+    assert client_with_session(forged_token).get("/auth/me").status_code == 401
+
+
+# -------- SECURITY LOG --------
+
+def test_security_events_are_logged(make_user_client, caplog):
+    caplog.set_level(logging.INFO, logger="app.security")
+
+    client = make_user_client("logged@example.com")
+    login(TestClient(app), "logged@example.com", "wrong-pass")
+
+    token = client.headers.pop(CSRF_HEADER_NAME)
+    client.post("/alerts", json=ALERT)
+
+    client.headers[CSRF_HEADER_NAME] = token
+    client.post("/auth/logout")
+
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "app.security"
+    ]
+
+    assert any(m.startswith("registered user_id=") for m in messages)
+    assert any(m.startswith("login_failed email=logged@example.com") for m in messages)
+    assert any(m.startswith("csrf_rejected method=POST path=/alerts") for m in messages)
+    assert any(m.startswith("logout user_id=") for m in messages)
+
+    # Passwords and tokens never appear in the log.
+    assert not any("wrong-pass" in m or "password123" in m for m in messages)
+    assert not any(token in m for m in messages)

@@ -19,7 +19,8 @@ This document describes what the app does, how it works, where it stands, and wh
 - ✅ Forecasts, alert management, wind-aware matching, accounts, per-account alerts, Alert History, and the side-menu layout.
 - ✅ Email notifications end to end: dry run, a real send to the alert's owner, failure handling, and once-per-day deduplication.
 - ✅ CSRF protection and login/registration rate limiting.
-- ⬜ Server-side session revocation, security logging, deployment, README and demo.
+- ✅ Server-side session revocation and security event logging.
+- ⬜ Deployment, README and demo.
 
 ---
 
@@ -187,7 +188,7 @@ surf-alerts/
 │   │   ├── main.py                 # Routes, ownership checks, CSRF middleware
 │   │   ├── auth.py                 # Register/login/me/logout, cookies, CSRF, rate limits
 │   │   ├── database.py             # Engine, sessions, Base, get_db
-│   │   ├── models.py               # User, SurfSpot, Alert, AlertMatch, NotificationDelivery
+│   │   ├── models.py               # User, UserSession, SurfSpot, Alert, AlertMatch, NotificationDelivery
 │   │   ├── schemas.py              # Pydantic models and validation
 │   │   ├── seed.py                 # Seeds the initial surf spots
 │   │   ├── data/
@@ -215,7 +216,7 @@ surf-alerts/
         ├── main.tsx
         ├── App.tsx                 # Session check, side menu, page selection
         ├── Dashboard.tsx           # Surf Spots and My Alerts pages
-        ├── api.ts                  # CSRF header helper
+        ├── api.ts                  # apiFetch: CSRF header, session-ended handling
         ├── index.css
         ├── auth.css
         └── components/
@@ -235,7 +236,7 @@ surf-alerts/
 - **`AlertHistory.tsx`** loads one alert's saved matches and delivery records.
 - **`AuthPage.tsx`** handles login and registration, with errors shown next to the form.
 - **`ForecastCard.tsx`** displays one forecast hour with units and compass directions.
-- **`api.ts`** reads the `csrf_token` cookie and builds the `X-CSRF-Token` header.
+- **`api.ts`** provides `apiFetch`, which every signed-in page uses: it adds the `X-CSRF-Token` header to state-changing requests, and on a 401 it tells `App` to show the login page, so a tab whose session ended (for example, logged out in another tab) returns to login on its next request.
 - **`main.py`** holds thin route handlers that enforce login, ownership, and CSRF, and hand forecast and matching work to the services.
 - **`auth.py`** handles password hashing, session and CSRF cookies, rate limiting, and the current-user dependency.
 - **`forecast.py`** fetches marine and weather data and merges them hour by hour.
@@ -248,7 +249,8 @@ surf-alerts/
 
 ```text
 users (1) ────────────< (many) alerts >────────── (1) surf_spots
-                              |
+  |                           |
+  +────< user_sessions        |
                               +────< alert_matches
                               |
                               +────< notification_deliveries
@@ -262,6 +264,18 @@ users (1) ────────────< (many) alerts >─────�
 | `email` | VARCHAR(255) | Unique, indexed, stored lowercase |
 | `password_hash` | VARCHAR(255) | Argon2 hash; passwords are never stored |
 | `created_at` | TIMESTAMPTZ | Defaults to now |
+
+### `user_sessions`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | VARCHAR(64) | Primary key; a random session id, also stored in the session token |
+| `user_id` | INTEGER | References `users.id`, indexed |
+| `created_at` | TIMESTAMPTZ | When the user logged in |
+| `expires_at` | TIMESTAMPTZ | 7 days after login |
+| `revoked_at` | TIMESTAMPTZ, nullable | Set at logout; a revoked session can't be used again |
+
+There's one row per login, so each device has its own session. A user's expired rows are cleaned up the next time they log in.
 
 ### `surf_spots`
 
@@ -340,7 +354,7 @@ A unique constraint on `(alert_id, surf_date)` allows only one email attempt per
 | POST | `/auth/register` | Public | Creates the account and sets the session and CSRF cookies. **429** after 10 attempts per IP per hour |
 | POST | `/auth/login` | Public | Checks the password and sets the session and CSRF cookies. **429** (with `Retry-After`) after 5 failures for one email from one IP, or 20 from one IP, within 15 minutes |
 | GET | `/auth/me` | Session | Returns the user's id and email; also refreshes the CSRF cookie |
-| POST | `/auth/logout` | Session + CSRF | Clears both cookies |
+| POST | `/auth/logout` | Session + CSRF | Revokes the session server-side and clears both cookies |
 
 ### Forecasts and surf spots
 
@@ -460,17 +474,20 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 ### How it works
 
 - **Passwords** are hashed with Argon2 and never stored.
-- **Sessions** are signed JWTs (user id, 7-day expiry) in an `HttpOnly`, `SameSite=Lax` cookie, which JavaScript can't read. The `Secure` flag is controlled by `COOKIE_SECURE` and must be on under HTTPS.
+- **Sessions** are signed JWTs (user id, session id, 7-day expiry) in an `HttpOnly`, `SameSite=Lax` cookie, which JavaScript can't read. The `Secure` flag is controlled by `COOKIE_SECURE` and must be on under HTTPS.
+- **Server-side revocation:** every login creates a `user_sessions` row, and every request checks that the token's session exists and hasn't been revoked. Logout revokes it, so a copied token stops working immediately, while the user's other devices stay signed in.
 - **CSRF protection** uses a signed double-submit token. At login the server also sets a readable `csrf_token` cookie, an HMAC-SHA256 of the session token keyed with the server secret. The frontend sends it back in `X-CSRF-Token` on every change, and middleware rejects mismatches with 403. Because the token is tied to the session, one session's token can't be used with another. `/auth/me` refreshes the cookie, so sessions that existed before CSRF protection keep working.
 - **Rate limiting** caps failed logins per email and IP and per IP, and caps registrations per IP (limits in §7). A successful login resets that account's count.
 - **Authorization:** every alert route checks both the alert id and the owner. Other users' alerts return 404.
-- **Logout** clears the cookies, but the token itself stays valid until it expires; there's no server-side revocation yet.
+- **Security log:** the `app.security` logger records registrations, logins, failed logins, rate-limit lockouts, logouts, uses of revoked or unknown sessions, and CSRF rejections, each with the user id or email and the client IP. Passwords and tokens are never logged.
 
 ### Limitations and remaining work
 
 - Rate-limit counts are kept in memory, so they reset on restart and only work within a single API process. Several instances would need a shared store such as Redis.
 - Behind a reverse proxy, uvicorn must run with `--proxy-headers` and a trusted `--forwarded-allow-ips`, or every visitor looks like the proxy's IP. Locally, every request arrives from `127.0.0.1` through Vite.
-- Still to do: server-side session revocation, security event logging, HTTPS-only cookies in production, a CORS and proxy review, secrets management, dependency scanning, and limits on public forecast requests.
+- Security logs currently go to the server's console; in production they should go to a log service with retention and alerts.
+- There's no "log out everywhere" yet, and changing a password (once that exists) should revoke all of a user's sessions.
+- Still to do: HTTPS-only cookies in production, a CORS and proxy review, secrets management, dependency scanning, and limits on public forecast requests.
 - Forecast and spot listing routes are public on purpose; adding a spot requires a session.
 - Authorization is enforced in the application; PostgreSQL row-level security isn't used.
 
@@ -478,7 +495,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 
 ## 11. Testing
 
-### Automated tests (32 passing)
+### Automated tests (37 passing)
 
 | File | Covers |
 |---|---|
@@ -488,7 +505,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 | `test_wind_matching.py` | Wind below, at, and above the limit; missing wind; no limit; paused |
 | `test_alert_ownership.py` | Login required; one user can't list, edit, pause, delete, or check another user's alerts |
 | `test_alert_history.py` | The owner sees history; other users get 404; login required |
-| `test_security.py` | Missing, wrong, and other-session CSRF tokens rejected; reads exempt; CSRF cookie refresh; logout; login lockout, reset on success, per-account limits, registration limit |
+| `test_security.py` | CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected. Security log: events recorded, no passwords or tokens |
 
 The tests run against an in-memory SQLite database, so PostgreSQL-specific behavior such as `ON CONFLICT` is verified by running the real worker.
 
@@ -593,7 +610,7 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 | Navigation | Side menu with Surf Spots, My Alerts, and Alert History pages | ✅ |
 | CSRF protection | Signed double-submit token | ✅ |
 | Rate limiting | Login and registration limits | ✅ |
-| Session hardening | Server-side revocation, security logging | ⬜ |
+| Session hardening | Server-side revocation, security logging | ✅ |
 | Deployment | Hosted frontend, API, database, worker | ⬜ |
 | README and demo | Setup guide, screenshots, demo recording | ⬜ |
 
@@ -606,7 +623,7 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 - ✅ Database migrations current, with every alert required to have an owner.
 - ✅ Tests, lint, and build passing.
 - ✅ Alert History showing real stored data, private to each owner.
-- ⬜ Send the user back to the login page when a session expires mid-visit, using `api.ts` as the shared place for request handling.
+- ✅ Return to the login page when a session ends mid-visit (any 401 from `apiFetch`).
 
 ### Notifications
 
@@ -622,8 +639,9 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 - ✅ CSRF protection on every state-changing request.
 - ✅ Login and registration rate limiting.
 - ✅ Tests for cross-account and logged-out access.
-- ⬜ Security event logging: failed logins, lockouts, CSRF rejections.
-- ⬜ Server-side session revocation and renewal, a password policy, and HTTPS-only cookies.
+- ✅ Security event logging: logins, failed logins, lockouts, logouts, revoked-session use, CSRF rejections.
+- ✅ Server-side session revocation.
+- ⬜ Session renewal, "log out everywhere", a password policy, and HTTPS-only cookies.
 - ⬜ A check that no secrets are in the repo or the frontend bundle.
 - ⬜ Limits on public forecast requests.
 
@@ -653,7 +671,7 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 4. **Email reliability:** the database and the email provider can't share a transaction, so retries need clear rules rather than blind resending.
 5. **Edited alerts:** saved matches stay attached when an alert's thresholds change, and the old thresholds aren't stored. Alert versions could fix that.
 6. **Forecast accuracy:** modeled offshore wave height isn't the same as breaking-wave height at a beach. Surf-quality scores would need coastline and bathymetry data.
-7. **Sessions:** cookies and CSRF are in place; revocation and renewal aren't yet.
+7. **Sessions:** cookies, CSRF, and server-side revocation are in place; session renewal isn't yet.
 8. **Ownership:** every new alert-related route has to check ownership the same way.
 9. **Frontend structure:** `Dashboard.tsx` could be split into smaller components, and `api.ts` grown into a typed API client.
 10. **Honest labels:** emails are shown as pending, accepted, or failed, never "delivered."
@@ -691,4 +709,4 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 
 ---
 
-**Next:** Security event logging and server-side session revocation.
+**Next:** More breaks, with search and region grouping, before deploying.

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiFetch } from "../api";
 import "./AlertHistory.css";
 
 type SavedAlert = {
@@ -98,7 +99,7 @@ export default function AlertHistory() {
       setListError("");
 
       try {
-        const response = await fetch("/api/alerts", {
+        const response = await apiFetch("/api/alerts", {
           credentials: "same-origin",
         });
 
@@ -157,7 +158,7 @@ export default function AlertHistory() {
       setHistoryError("");
 
       try {
-        const response = await fetch(
+        const response = await apiFetch(
           `/api/alerts/${alertId}/history`,
           {
             credentials: "same-origin",

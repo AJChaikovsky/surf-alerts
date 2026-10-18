@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Dashboard from "./Dashboard";
 import AlertHistory from "./components/AlertHistory";
 import SideNav, { type Page } from "./components/SideNav";
-import { csrfHeaders } from "./api";
+import { apiFetch, SESSION_EXPIRED_EVENT } from "./api";
 
 import AuthPage, {
   type AuthenticatedUser,
@@ -105,6 +105,25 @@ function App() {
     };
   }, []);
 
+  // -------- SESSION ENDED WHILE THE PAGE WAS OPEN --------
+  // e.g. logged out in another tab; any 401 from apiFetch lands here.
+
+  useEffect(() => {
+    function handleSessionExpired() {
+      setUser(null);
+      setAuthStatus("unauthenticated");
+    }
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+
+    return () => {
+      window.removeEventListener(
+        SESSION_EXPIRED_EVENT,
+        handleSessionExpired
+      );
+    };
+  }, []);
+
   // -------- SUCCESSFUL LOGIN / REGISTRATION --------
 
   function handleAuthenticated(
@@ -126,10 +145,8 @@ function App() {
     setLogoutError("");
 
     try {
-      const response = await fetch("/api/auth/logout", {
+      const response = await apiFetch("/api/auth/logout", {
         method: "POST",
-        credentials: "same-origin",
-        headers: csrfHeaders(),
       });
 
       if (!response.ok) {

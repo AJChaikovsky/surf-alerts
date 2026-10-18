@@ -1,7 +1,9 @@
 import hashlib
 import hmac
+import logging
 import math
 import os
+import secrets
 import threading
 import time
 from collections import defaultdict, deque
@@ -21,12 +23,12 @@ from fastapi import (
 )
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from pwdlib import PasswordHash
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import User, UserSession
 
 
 # -------- CONFIGURATION --------
@@ -43,6 +45,10 @@ if not JWT_SECRET_KEY or len(JWT_SECRET_KEY) < 32:
     )
 
 JWT_ALGORITHM = "HS256"
+
+# Security events: logins, lockouts, revoked sessions, CSRF rejections.
+# Never log passwords or tokens.
+security_log = logging.getLogger("app.security")
 
 COOKIE_NAME = "surf_session"
 
@@ -105,13 +111,34 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def create_session_token(user_id: int) -> str:
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        days=SESSION_DAYS
+def create_session_token(db: Session, user_id: int) -> str:
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=SESSION_DAYS)
+
+    # Each login gets its own row, so logging out on one
+    # device revokes only that session.
+    session_id = secrets.token_urlsafe(32)
+
+    # Drop this user's expired sessions while we're here.
+    db.execute(
+        delete(UserSession).where(
+            UserSession.user_id == user_id,
+            UserSession.expires_at < now
+        )
     )
+
+    db.add(
+        UserSession(
+            id=session_id,
+            user_id=user_id,
+            expires_at=expires_at
+        )
+    )
+    db.commit()
 
     payload = {
         "sub": str(user_id),
+        "jti": session_id,
         "exp": expires_at,
         "type": "session"
     }
@@ -121,6 +148,28 @@ def create_session_token(user_id: int) -> str:
         JWT_SECRET_KEY,
         algorithm=JWT_ALGORITHM
     )
+
+
+def decode_session_token(token: str) -> tuple[int, str]:
+    """Return (user_id, session_id), or raise ValueError."""
+    try:
+        payload = jwt.decode(
+            token,
+            JWT_SECRET_KEY,
+            algorithms=[JWT_ALGORITHM]
+        )
+
+        if payload.get("type") != "session":
+            raise ValueError("Invalid token type")
+
+        return int(payload["sub"]), str(payload["jti"])
+
+    except (
+        jwt.InvalidTokenError,
+        KeyError,
+        TypeError,
+    ) as exc:
+        raise ValueError("Invalid session token") from exc
 
 
 def csrf_token_for(session_token: str) -> str:
@@ -150,9 +199,10 @@ def set_csrf_cookie(
 
 def set_session_cookie(
     response: Response,
+    db: Session,
     user_id: int
 ):
-    token = create_session_token(user_id)
+    token = create_session_token(db, user_id)
 
     response.set_cookie(
         key=COOKIE_NAME,
@@ -215,6 +265,8 @@ def check_rate_limit(key: str, limit: int, window: int):
 
         retry_after = attempts[0] + window - time.monotonic()
 
+    security_log.warning("rate_limited key=%s", key)
+
     raise HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         detail="Too many attempts. Please try again later.",
@@ -242,6 +294,7 @@ def client_ip(request: Request) -> str:
 
 
 def get_current_user(
+    request: Request,
     token: str | None = Cookie(
         default=None,
         alias=COOKIE_NAME
@@ -255,26 +308,34 @@ def get_current_user(
         )
 
     try:
-        payload = jwt.decode(
-            token,
-            JWT_SECRET_KEY,
-            algorithms=[JWT_ALGORITHM]
-        )
+        user_id, session_id = decode_session_token(token)
 
-        if payload.get("type") != "session":
-            raise ValueError("Invalid token type")
-
-        user_id = int(payload["sub"])
-
-    except (
-        jwt.InvalidTokenError,
-        KeyError,
-        TypeError,
-        ValueError,
-    ):
+    except ValueError:
+        # Expired, tampered with, or issued before
+        # server-side sessions existed.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired session"
+        )
+
+    # A signed token is only valid while its session row
+    # exists and hasn't been revoked by logout.
+    session = db.get(UserSession, session_id)
+
+    if (
+        session is None
+        or session.revoked_at is not None
+        or session.user_id != user_id
+    ):
+        security_log.warning(
+            "revoked_session_used user_id=%s ip=%s",
+            user_id,
+            client_ip(request)
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or revoked"
         )
 
     user = db.get(User, user_id)
@@ -341,7 +402,13 @@ def register(
             detail="Email already registered"
         )
 
-    set_session_cookie(response, new_user.id)
+    set_session_cookie(response, db, new_user.id)
+
+    security_log.info(
+        "registered user_id=%s ip=%s",
+        new_user.id,
+        client_ip(request)
+    )
 
     return new_user
 
@@ -391,6 +458,12 @@ def login(
         record_attempt(account_key)
         record_attempt(ip_key)
 
+        security_log.warning(
+            "login_failed email=%s ip=%s",
+            email,
+            ip
+        )
+
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
@@ -398,7 +471,13 @@ def login(
 
     clear_attempts(account_key)
 
-    set_session_cookie(response, user.id)
+    set_session_cookie(response, db, user.id)
+
+    security_log.info(
+        "login user_id=%s ip=%s",
+        user.id,
+        ip
+    )
 
     return user
 
@@ -424,7 +503,35 @@ def get_me(
 # -------- LOGOUT --------
 
 @router.post("/logout")
-def logout(response: Response):
+def logout(
+    response: Response,
+    token: str | None = Cookie(
+        default=None,
+        alias=COOKIE_NAME
+    ),
+    db: Session = Depends(get_db)
+):
+    # Revoke the session server-side, so a copied token
+    # stops working even though it hasn't expired.
+    if token:
+        try:
+            user_id, session_id = decode_session_token(token)
+
+        except ValueError:
+            user_id, session_id = None, None
+
+        session = (
+            db.get(UserSession, session_id)
+            if session_id
+            else None
+        )
+
+        if session is not None and session.revoked_at is None:
+            session.revoked_at = datetime.now(timezone.utc)
+            db.commit()
+
+            security_log.info("logout user_id=%s", user_id)
+
     response.delete_cookie(
         key=COOKIE_NAME,
         path="/",
