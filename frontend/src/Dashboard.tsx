@@ -212,11 +212,32 @@ function App({ view }: { view: DashboardView }) {
         setSpots(spotsData);
         setAlerts(alertsData);
 
+        // "Add to alerts" on the map links to #/alerts?spot=<id>.
+        const requestedSpotId = Number(
+          new URLSearchParams(window.location.hash.split("?")[1]).get("spot")
+        );
+        const requestedSpot = spotsData.find(
+          (spot) => spot.id === requestedSpotId
+        );
+
         if (spotsData.length > 0) {
           setCreateValues((previous) => ({
             ...previous,
-            spot_id: String(spotsData[0].id),
+            spot_id: String((requestedSpot ?? spotsData[0]).id),
           }));
+        }
+
+        if (requestedSpot) {
+          // Drop the parameter so a refresh doesn't reapply it.
+          window.history.replaceState(null, "", "#/alerts");
+
+          setFormMessage(
+            `${requestedSpot.name} is selected. Name your alert and set its conditions.`
+          );
+
+          requestAnimationFrame(() => {
+            document.getElementById("alert-name")?.focus();
+          });
         }
       } catch {
         setDashboardError("Unable to load dashboard data.");

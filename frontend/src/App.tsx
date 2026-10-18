@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Dashboard from "./Dashboard";
 import AlertHistory from "./components/AlertHistory";
 import LocalBreaks from "./components/LocalBreaks";
+import SpotMap from "./components/SpotMap";
 import SideNav, { type Page } from "./components/SideNav";
 import { apiFetch, SESSION_EXPIRED_EVENT } from "./api";
 
@@ -19,13 +20,14 @@ type AuthStatus =
   | "unauthenticated"
   | "error";
 
-// Read the current page from the URL, e.g. #/alerts.
-function pageFromHash(): Page {
-  const page = window.location.hash.replace("#/", "");
+const PAGES: Page[] = ["spots", "map", "breaks", "alerts", "history"];
 
-  return page === "breaks" || page === "alerts" || page === "history"
-    ? page
-    : "spots";
+// Read the current page from the URL, e.g. #/alerts or
+// #/alerts?spot=5 (query parameters are read by the page itself).
+function pageFromHash(): Page {
+  const page = window.location.hash.replace("#/", "").split("?")[0];
+
+  return PAGES.find((known) => known === page) ?? "spots";
 }
 
 function App() {
@@ -266,6 +268,8 @@ function App() {
             </div>
           ) : page === "breaks" ? (
             <LocalBreaks />
+          ) : page === "map" ? (
+            <SpotMap />
           ) : (
             <Dashboard view={page} />
           )}

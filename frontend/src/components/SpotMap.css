@@ -1,0 +1,151 @@
+/* -------- MAP -------- */
+
+.map-frame {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.map-canvas {
+  height: calc(100vh - 290px);
+  min-height: 420px;
+  width: 100%;
+}
+
+/* -------- LEGEND -------- */
+/* Colors match COLORS in SpotMap.tsx. */
+
+.map-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  margin: 0 0 16px;
+  padding: 0;
+  font-size: 13px;
+  color: #334155;
+}
+
+.map-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.map-legend-dot.spot {
+  background: #0c7899;
+}
+
+.map-legend-dot.local {
+  background: #7c3aed;
+}
+
+.map-legend-dot.matching {
+  background: #16a34a;
+  width: 15px;
+  height: 15px;
+}
+
+.map-legend-status {
+  margin-left: auto;
+  color: #64748b;
+}
+
+/* -------- POPUP -------- */
+
+.map-popup {
+  min-width: 210px;
+  font-family: Arial, sans-serif;
+  color: #172b3a;
+}
+
+.map-popup h3 {
+  margin: 0 0 2px;
+  font-size: 16px;
+}
+
+.map-popup p {
+  margin: 0;
+}
+
+.map-popup-region {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 10px !important;
+}
+
+.map-popup-match {
+  display: inline-block;
+  margin-bottom: 10px !important;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.map-popup-values {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.map-popup-values dt {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.map-popup-values dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #087695;
+  white-space: nowrap;
+}
+
+.map-popup-muted {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 10px !important;
+}
+
+.map-popup-button {
+  display: block;
+  margin-top: 4px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #087695;
+  color: white !important;
+  text-align: center;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.map-popup-button:hover {
+  background: #065f78;
+}
+
+/* -------- MOBILE -------- */
+
+@media (max-width: 800px) {
+  .map-canvas {
+    height: calc(100vh - 340px);
+  }
+
+  .map-legend-status {
+    margin-left: 0;
+    width: 100%;
+  }
+}

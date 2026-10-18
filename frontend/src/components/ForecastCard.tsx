@@ -1,3 +1,4 @@
+import { compassDirection } from "../compass";
 import "./ForecastCard.css";
 
 export type ForecastHour = {
@@ -15,24 +16,6 @@ export type ForecastHour = {
 type ForecastCardProps = {
   forecast: ForecastHour;
 };
-
-// Convert compass degrees to readable directions
-function compassDirection(degrees: number | null): string {
-  if (degrees === null) {
-    return "N/A";
-  }
-
-  const directions = [
-    "N", "NE", "E", "SE",
-    "S", "SW", "W", "NW",
-  ];
-
-  const index = Math.round(
-    (((degrees % 360) + 360) % 360) / 45
-  ) % 8;
-
-  return directions[index];
-}
 
 // Format a measurement while handling missing data
 function formatValue(

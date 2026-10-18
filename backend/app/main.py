@@ -1,8 +1,12 @@
 
+import asyncio
 import logging
 import math
 import re
 import secrets
+from collections import defaultdict
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -450,6 +454,89 @@ def list_alerts(
         .where(Alert.user_id == current_user.id)
         .order_by(Alert.id)
     ).all()
+
+
+# -------- SPOTS WHERE MY ALERTS MATCH RIGHT NOW --------
+# Powers the map's "matching" color. Defined before the
+# /alerts/{alert_id} routes it sits alongside.
+
+PACIFIC = ZoneInfo("America/Los_Angeles")
+
+
+def current_pacific_hour() -> str:
+    # Same format as forecast times, e.g. "2026-10-18T15:00".
+    return datetime.now(PACIFIC).strftime("%Y-%m-%dT%H:00")
+
+
+async def current_forecast_hour(spot: SurfSpot) -> dict | None:
+    try:
+        forecast = format_forecast(
+            await get_forecast(spot.latitude, spot.longitude)
+        )
+
+    except Exception:
+        # One spot's forecast failing shouldn't break the map.
+        return None
+
+    now = current_pacific_hour()
+
+    return next(
+        (hour for hour in forecast if hour["time"] >= now),
+        None
+    )
+
+
+@app.get("/alerts/current-matches")
+async def current_alert_matches(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    rows = db.execute(
+        select(Alert, SurfSpot)
+        .join(SurfSpot, Alert.spot_id == SurfSpot.id)
+        .where(
+            Alert.user_id == current_user.id,
+            Alert.is_active.is_(True)
+        )
+    ).all()
+
+    # Fetch each spot's forecast once, all spots in parallel.
+    alerts_by_spot = defaultdict(list)
+    spots = {}
+
+    for alert, spot in rows:
+        alerts_by_spot[spot.id].append(alert)
+        spots[spot.id] = spot
+
+    hours = await asyncio.gather(
+        *(current_forecast_hour(spot) for spot in spots.values())
+    )
+
+    matches = []
+
+    for spot, hour in zip(spots.values(), hours):
+        if hour is None:
+            continue
+
+        matching_alerts = [
+            alert
+            for alert in alerts_by_spot[spot.id]
+            if find_matching_hours([hour], alert)
+        ]
+
+        if matching_alerts:
+            matches.append({
+                "spot_id": spot.id,
+                "alerts": [
+                    {"id": alert.id, "name": alert.name}
+                    for alert in matching_alerts
+                ],
+            })
+
+    return {
+        "forecast_hour": current_pacific_hour(),
+        "spots": matches,
+    }
 
 
 # -------- VIEW MY ALERT MATCHES --------
