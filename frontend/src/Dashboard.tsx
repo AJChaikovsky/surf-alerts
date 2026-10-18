@@ -3,6 +3,8 @@ import ForecastCard, {
   type ForecastHour,
 } from "./components/ForecastCard";
 
+export type DashboardView = "spots" | "alerts";
+
 type SurfSpot = {
   id: number;
   slug: string;
@@ -119,7 +121,7 @@ function makeAlertPayload(
 
 // -------- MAIN APP --------
 
-function App() {
+function App({ view }: { view: DashboardView }) {
   const [spots, setSpots] = useState<SurfSpot[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
 
@@ -427,8 +429,17 @@ function App() {
       {/* HEADER */}
 
       <header>
-        <h1>Surf Alerts</h1>
-        <p>Your personalized surf forecasting dashboard.</p>
+        {view === "spots" ? (
+          <>
+            <h1>Surf Forecasts</h1>
+            <p>Pick a surf spot to see its upcoming hourly forecast.</p>
+          </>
+        ) : (
+          <>
+            <h1>My Alerts</h1>
+            <p>Create surf alerts and manage the conditions you're watching for.</p>
+          </>
+        )}
       </header>
 
       {dashboardError && (
@@ -437,565 +448,573 @@ function App() {
         </p>
       )}
 
-      {/* SURF SPOTS */}
+      {view === "spots" && (
+        <>
+          {/* SURF SPOTS */}
 
-      <section>
-        <h2>Surf Spots</h2>
+          <section>
+            <h2>Surf Spots</h2>
 
-        <div className="spot-grid">
-          {spots.map((spot) => (
-            <button
-              key={spot.id}
-              type="button"
-              className={
-                selectedSpot?.id === spot.id
-                  ? "spot-card selected"
-                  : "spot-card"
-              }
-              onClick={() => selectSpot(spot)}
-            >
-              <h3>{spot.name}</h3>
-              <p>{spot.region}</p>
-              <span>View Forecast →</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* FORECAST */}
-
-      {forecastLoading && (
-        <p>Loading forecast...</p>
-      )}
-
-      {forecastError && (
-        <p className="error" role="alert">
-          {forecastError}
-        </p>
-      )}
-
-      {selectedSpot && !forecastLoading && !forecastError && (
-        <section className="forecast-section">
-          <h2>{selectedSpot.name} Forecast</h2>
-
-          <p className="forecast-note">
-            Offshore modeled wave conditions, not exact
-            breaking-wave heights.
-          </p>
-
-          {forecast.length === 0 ? (
-            <p>No upcoming forecast data available.</p>
-          ) : (
-            <div className="forecast-grid">
-              {forecast.map((hour) => (
-                <ForecastCard
-                  key={hour.time}
-                  forecast={hour}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* CREATE ALERT */}
-
-      <section className="alert-section">
-        <h2>Create a Surf Alert</h2>
-
-        <form className="alert-form" onSubmit={createAlert}>
-
-          <div className="form-group">
-            <label htmlFor="alert-name">Alert Name</label>
-
-            <input
-              id="alert-name"
-              type="text"
-              maxLength={100}
-              required
-              placeholder="Morning Surf Session"
-              value={createValues.name}
-              onChange={(e) =>
-                setCreateValues((previous) => ({
-                  ...previous,
-                  name: e.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="alert-spot">Surf Spot</label>
-
-            <select
-              id="alert-spot"
-              required
-              value={createValues.spot_id}
-              onChange={(e) =>
-                setCreateValues((previous) => ({
-                  ...previous,
-                  spot_id: e.target.value,
-                }))
-              }
-            >
+            <div className="spot-grid">
               {spots.map((spot) => (
-                <option key={spot.id} value={spot.id}>
-                  {spot.name}
-                </option>
+                <button
+                  key={spot.id}
+                  type="button"
+                  className={
+                    selectedSpot?.id === spot.id
+                      ? "spot-card selected"
+                      : "spot-card"
+                  }
+                  onClick={() => selectSpot(spot)}
+                >
+                  <h3>{spot.name}</h3>
+                  <p>{spot.region}</p>
+                  <span>View Forecast →</span>
+                </button>
               ))}
-            </select>
-          </div>
-
-          <div className="form-row">
-
-            <div className="form-group">
-              <label htmlFor="min-wave">
-                Minimum Wave Height (ft)
-              </label>
-
-              <input
-                id="min-wave"
-                type="number"
-                min="0"
-                step="0.1"
-                required
-                value={createValues.min_wave_height_ft}
-                onChange={(e) =>
-                  setCreateValues((previous) => ({
-                    ...previous,
-                    min_wave_height_ft: e.target.value,
-                  }))
-                }
-              />
             </div>
+          </section>
 
-            <div className="form-group">
-              <label htmlFor="max-wave">
-                Maximum Wave Height (ft)
-              </label>
+          {/* FORECAST */}
 
-              <input
-                id="max-wave"
-                type="number"
-                min="0"
-                step="0.1"
-                required
-                value={createValues.max_wave_height_ft}
-                onChange={(e) =>
-                  setCreateValues((previous) => ({
-                    ...previous,
-                    max_wave_height_ft: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="min-period">
-              Minimum Swell Period (seconds)
-            </label>
-
-            <input
-              id="min-period"
-              type="number"
-              min="0.1"
-              step="0.1"
-              required
-              value={createValues.min_swell_period_s}
-              onChange={(e) =>
-                setCreateValues((previous) => ({
-                  ...previous,
-                  min_swell_period_s: e.target.value,
-                }))
-              }
-            />
-          </div>
-
-          {/* NEW WIND SPEED FIELD */}
-
-          <div className="form-group">
-            <label htmlFor="max-wind">
-              Maximum Wind Speed (knots)
-            </label>
-
-            <input
-              id="max-wind"
-              type="number"
-              min="0"
-              step="0.1"
-              placeholder="Optional, e.g. 8"
-              value={createValues.max_wind_speed_kn}
-              onChange={(e) =>
-                setCreateValues((previous) => ({
-                  ...previous,
-                  max_wind_speed_kn: e.target.value,
-                }))
-              }
-            />
-
-            <small>
-              Leave blank for no wind speed restriction.
-            </small>
-          </div>
-
-          {/* FORM NOTIFICATIONS */}
-
-          {formError && (
-            <div
-              className="form-notification form-notification-error"
-              role="alert"
-            >
-              <span aria-hidden="true">✕</span>
-              <span>{formError}</span>
-            </div>
+          {forecastLoading && (
+            <p>Loading forecast...</p>
           )}
 
-          {formMessage && (
-            <div
-              className="form-notification form-notification-success"
-              role="status"
-            >
-              <span aria-hidden="true">✓</span>
-              <span>{formMessage}</span>
-            </div>
+          {forecastError && (
+            <p className="error" role="alert">
+              {forecastError}
+            </p>
           )}
 
-          <button
-            className="primary-button"
-            type="submit"
-            disabled={savingAlert || spots.length === 0}
-          >
-            {savingAlert ? "Creating..." : "Create Alert"}
-          </button>
+          {selectedSpot && !forecastLoading && !forecastError && (
+            <section className="forecast-section">
+              <h2>{selectedSpot.name} Forecast</h2>
 
-        </form>
-      </section>
+              <p className="forecast-note">
+                Offshore modeled wave conditions, not exact
+                breaking-wave heights.
+              </p>
 
-      {/* SAVED ALERTS */}
-
-      <section className="alert-section">
-        <h2>My Surf Alerts</h2>
-
-        {alertsLoading && (
-          <p>Loading saved alerts...</p>
-        )}
-
-        {!alertsLoading && alerts.length === 0 && (
-          <p>You haven't created any surf alerts yet.</p>
-        )}
-
-        {alertError && (
-          <p className="error" role="alert">
-            {alertError}
-          </p>
-        )}
-
-        <div className="saved-alerts">
-
-          {alerts.map((alert) => (
-            <div
-              className="saved-alert-card"
-              key={alert.id}
-            >
-
-              {/* ALERT HEADING */}
-
-              <div className="alert-heading">
-                <div>
-                  <h3>{alert.name}</h3>
-                  <p>{spotName(alert.spot_id)}</p>
+              {forecast.length === 0 ? (
+                <p>No upcoming forecast data available.</p>
+              ) : (
+                <div className="forecast-grid">
+                  {forecast.map((hour) => (
+                    <ForecastCard
+                      key={hour.time}
+                      forecast={hour}
+                    />
+                  ))}
                 </div>
+              )}
+            </section>
+          )}
+        </>
+      )}
 
-                <div className="alert-status">
-                  <span
-                    className={
-                      alert.is_active
-                        ? "status-dot active"
-                        : "status-dot paused"
-                    }
-                    aria-hidden="true"
-                  />
+      {view === "alerts" && (
+        <>
+          {/* CREATE ALERT */}
 
-                  <span>
-                    {alert.is_active ? "Active" : "Paused"}
-                  </span>
-                </div>
+          <section className="alert-section">
+            <h2>Create a Surf Alert</h2>
+
+            <form className="alert-form" onSubmit={createAlert}>
+
+              <div className="form-group">
+                <label htmlFor="alert-name">Alert Name</label>
+
+                <input
+                  id="alert-name"
+                  type="text"
+                  maxLength={100}
+                  required
+                  placeholder="Morning Surf Session"
+                  value={createValues.name}
+                  onChange={(e) =>
+                    setCreateValues((previous) => ({
+                      ...previous,
+                      name: e.target.value,
+                    }))
+                  }
+                />
               </div>
 
-              {/* SAVED CONDITIONS */}
+              <div className="form-group">
+                <label htmlFor="alert-spot">Surf Spot</label>
 
-              <p>
-                Waves: {alert.min_wave_height_ft}–
-                {alert.max_wave_height_ft} ft
-              </p>
-
-              <p>
-                Minimum swell period: {alert.min_swell_period_s} s
-              </p>
-
-              <p>
-                Maximum wind speed:{" "}
-                {alert.max_wind_speed_kn === null
-                  ? "No restriction"
-                  : `${alert.max_wind_speed_kn} kn`}
-              </p>
-
-              {/* EDIT FORM */}
-
-              {editingId === alert.id && (
-                <form
-                  className="edit-form"
-                  onSubmit={(event) => saveEdit(event, alert)}
+                <select
+                  id="alert-spot"
+                  required
+                  value={createValues.spot_id}
+                  onChange={(e) =>
+                    setCreateValues((previous) => ({
+                      ...previous,
+                      spot_id: e.target.value,
+                    }))
+                  }
                 >
+                  {spots.map((spot) => (
+                    <option key={spot.id} value={spot.id}>
+                      {spot.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                  <div className="form-group">
-                    <label htmlFor={`edit-name-${alert.id}`}>
-                      Alert Name
-                    </label>
+              <div className="form-row">
 
-                    <input
-                      id={`edit-name-${alert.id}`}
-                      type="text"
-                      required
-                      maxLength={100}
-                      value={editValues.name}
-                      onChange={(e) =>
-                        setEditValues((previous) => ({
-                          ...previous,
-                          name: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
+                <div className="form-group">
+                  <label htmlFor="min-wave">
+                    Minimum Wave Height (ft)
+                  </label>
 
-                  <div className="form-group">
-                    <label htmlFor={`edit-spot-${alert.id}`}>
-                      Surf Spot
-                    </label>
+                  <input
+                    id="min-wave"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    required
+                    value={createValues.min_wave_height_ft}
+                    onChange={(e) =>
+                      setCreateValues((previous) => ({
+                        ...previous,
+                        min_wave_height_ft: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
 
-                    <select
-                      id={`edit-spot-${alert.id}`}
-                      required
-                      value={editValues.spot_id}
-                      onChange={(e) =>
-                        setEditValues((previous) => ({
-                          ...previous,
-                          spot_id: e.target.value,
-                        }))
-                      }
-                    >
-                      {spots.map((spot) => (
-                        <option key={spot.id} value={spot.id}>
-                          {spot.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="form-group">
+                  <label htmlFor="max-wave">
+                    Maximum Wave Height (ft)
+                  </label>
 
-                  <div className="form-group">
-                    <label htmlFor={`edit-min-${alert.id}`}>
-                      Minimum Wave Height (ft)
-                    </label>
+                  <input
+                    id="max-wave"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    required
+                    value={createValues.max_wave_height_ft}
+                    onChange={(e) =>
+                      setCreateValues((previous) => ({
+                        ...previous,
+                        max_wave_height_ft: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
 
-                    <input
-                      id={`edit-min-${alert.id}`}
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      required
-                      value={editValues.min_wave_height_ft}
-                      onChange={(e) =>
-                        setEditValues((previous) => ({
-                          ...previous,
-                          min_wave_height_ft: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
+              </div>
 
-                  <div className="form-group">
-                    <label htmlFor={`edit-max-${alert.id}`}>
-                      Maximum Wave Height (ft)
-                    </label>
+              <div className="form-group">
+                <label htmlFor="min-period">
+                  Minimum Swell Period (seconds)
+                </label>
 
-                    <input
-                      id={`edit-max-${alert.id}`}
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      required
-                      value={editValues.max_wave_height_ft}
-                      onChange={(e) =>
-                        setEditValues((previous) => ({
-                          ...previous,
-                          max_wave_height_ft: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
+                <input
+                  id="min-period"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  required
+                  value={createValues.min_swell_period_s}
+                  onChange={(e) =>
+                    setCreateValues((previous) => ({
+                      ...previous,
+                      min_swell_period_s: e.target.value,
+                    }))
+                  }
+                />
+              </div>
 
-                  <div className="form-group">
-                    <label htmlFor={`edit-period-${alert.id}`}>
-                      Minimum Swell Period (seconds)
-                    </label>
+              {/* NEW WIND SPEED FIELD */}
 
-                    <input
-                      id={`edit-period-${alert.id}`}
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      required
-                      value={editValues.min_swell_period_s}
-                      onChange={(e) =>
-                        setEditValues((previous) => ({
-                          ...previous,
-                          min_swell_period_s: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
+              <div className="form-group">
+                <label htmlFor="max-wind">
+                  Maximum Wind Speed (knots)
+                </label>
 
-                  {/* NEW EDIT WIND FIELD */}
+                <input
+                  id="max-wind"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="Optional, e.g. 8"
+                  value={createValues.max_wind_speed_kn}
+                  onChange={(e) =>
+                    setCreateValues((previous) => ({
+                      ...previous,
+                      max_wind_speed_kn: e.target.value,
+                    }))
+                  }
+                />
 
-                  <div className="form-group">
-                    <label htmlFor={`edit-wind-${alert.id}`}>
-                      Maximum Wind Speed (knots)
-                    </label>
+                <small>
+                  Leave blank for no wind speed restriction.
+                </small>
+              </div>
 
-                    <input
-                      id={`edit-wind-${alert.id}`}
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      placeholder="Optional"
-                      value={editValues.max_wind_speed_kn}
-                      onChange={(e) =>
-                        setEditValues((previous) => ({
-                          ...previous,
-                          max_wind_speed_kn: e.target.value,
-                        }))
-                      }
-                    />
+              {/* FORM NOTIFICATIONS */}
 
-                    <small>
-                      Leave blank for no wind restriction.
-                    </small>
-                  </div>
-
-                  <div className="alert-actions">
-
-                    <button
-                      className="primary-button"
-                      type="submit"
-                      disabled={busyAlertId === alert.id}
-                    >
-                      {busyAlertId === alert.id
-                        ? "Saving..."
-                        : "Save Changes"}
-                    </button>
-
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      disabled={busyAlertId === alert.id}
-                      onClick={() => setEditingId(null)}
-                    >
-                      Cancel
-                    </button>
-
-                  </div>
-                </form>
-              )}
-
-              {/* NORMAL ALERT BUTTONS */}
-
-              {editingId !== alert.id &&
-                deleteConfirmId !== alert.id && (
-                  <div className="alert-actions">
-
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      disabled={busyAlertId === alert.id}
-                      onClick={() => startEditing(alert)}
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      disabled={busyAlertId === alert.id}
-                      onClick={() => toggleAlert(alert)}
-                    >
-                      {busyAlertId === alert.id
-                        ? "Updating..."
-                        : alert.is_active
-                          ? "Pause"
-                          : "Reactivate"}
-                    </button>
-
-                    <button
-                      className="delete-button"
-                      type="button"
-                      disabled={busyAlertId === alert.id}
-                      onClick={() => {
-                        setEditingId(null);
-                        setAlertError("");
-                        setDeleteConfirmId(alert.id);
-                      }}
-                    >
-                      Delete
-                    </button>
-
-                  </div>
-                )}
-
-              {/* DELETE CONFIRMATION */}
-
-              {deleteConfirmId === alert.id && (
-                <div className="delete-confirmation">
-
-                  <p>
-                    Permanently delete{" "}
-                    <strong>{alert.name}</strong>?
-                    Its saved matches and notification history
-                    will also be removed.
-                  </p>
-
-                  <div className="alert-actions">
-
-                    <button
-                      className="delete-button"
-                      type="button"
-                      disabled={busyAlertId === alert.id}
-                      onClick={() => deleteAlert(alert.id)}
-                    >
-                      {busyAlertId === alert.id
-                        ? "Deleting..."
-                        : "Yes, Delete"}
-                    </button>
-
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      disabled={busyAlertId === alert.id}
-                      onClick={() => setDeleteConfirmId(null)}
-                    >
-                      Cancel
-                    </button>
-
-                  </div>
+              {formError && (
+                <div
+                  className="form-notification form-notification-error"
+                  role="alert"
+                >
+                  <span aria-hidden="true">✕</span>
+                  <span>{formError}</span>
                 </div>
               )}
 
-            </div>
-          ))}
+              {formMessage && (
+                <div
+                  className="form-notification form-notification-success"
+                  role="status"
+                >
+                  <span aria-hidden="true">✓</span>
+                  <span>{formMessage}</span>
+                </div>
+              )}
 
-        </div>
-      </section>
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={savingAlert || spots.length === 0}
+              >
+                {savingAlert ? "Creating..." : "Create Alert"}
+              </button>
+
+            </form>
+          </section>
+
+          {/* SAVED ALERTS */}
+
+          <section className="alert-section">
+            <h2>My Surf Alerts</h2>
+
+            {alertsLoading && (
+              <p>Loading saved alerts...</p>
+            )}
+
+            {!alertsLoading && alerts.length === 0 && (
+              <p>You haven't created any surf alerts yet.</p>
+            )}
+
+            {alertError && (
+              <p className="error" role="alert">
+                {alertError}
+              </p>
+            )}
+
+            <div className="saved-alerts">
+
+              {alerts.map((alert) => (
+                <div
+                  className="saved-alert-card"
+                  key={alert.id}
+                >
+
+                  {/* ALERT HEADING */}
+
+                  <div className="alert-heading">
+                    <div>
+                      <h3>{alert.name}</h3>
+                      <p>{spotName(alert.spot_id)}</p>
+                    </div>
+
+                    <div className="alert-status">
+                      <span
+                        className={
+                          alert.is_active
+                            ? "status-dot active"
+                            : "status-dot paused"
+                        }
+                        aria-hidden="true"
+                      />
+
+                      <span>
+                        {alert.is_active ? "Active" : "Paused"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* SAVED CONDITIONS */}
+
+                  <p>
+                    Waves: {alert.min_wave_height_ft}–
+                    {alert.max_wave_height_ft} ft
+                  </p>
+
+                  <p>
+                    Minimum swell period: {alert.min_swell_period_s} s
+                  </p>
+
+                  <p>
+                    Maximum wind speed:{" "}
+                    {alert.max_wind_speed_kn === null
+                      ? "No restriction"
+                      : `${alert.max_wind_speed_kn} kn`}
+                  </p>
+
+                  {/* EDIT FORM */}
+
+                  {editingId === alert.id && (
+                    <form
+                      className="edit-form"
+                      onSubmit={(event) => saveEdit(event, alert)}
+                    >
+
+                      <div className="form-group">
+                        <label htmlFor={`edit-name-${alert.id}`}>
+                          Alert Name
+                        </label>
+
+                        <input
+                          id={`edit-name-${alert.id}`}
+                          type="text"
+                          required
+                          maxLength={100}
+                          value={editValues.name}
+                          onChange={(e) =>
+                            setEditValues((previous) => ({
+                              ...previous,
+                              name: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`edit-spot-${alert.id}`}>
+                          Surf Spot
+                        </label>
+
+                        <select
+                          id={`edit-spot-${alert.id}`}
+                          required
+                          value={editValues.spot_id}
+                          onChange={(e) =>
+                            setEditValues((previous) => ({
+                              ...previous,
+                              spot_id: e.target.value,
+                            }))
+                          }
+                        >
+                          {spots.map((spot) => (
+                            <option key={spot.id} value={spot.id}>
+                              {spot.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`edit-min-${alert.id}`}>
+                          Minimum Wave Height (ft)
+                        </label>
+
+                        <input
+                          id={`edit-min-${alert.id}`}
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          required
+                          value={editValues.min_wave_height_ft}
+                          onChange={(e) =>
+                            setEditValues((previous) => ({
+                              ...previous,
+                              min_wave_height_ft: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`edit-max-${alert.id}`}>
+                          Maximum Wave Height (ft)
+                        </label>
+
+                        <input
+                          id={`edit-max-${alert.id}`}
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          required
+                          value={editValues.max_wave_height_ft}
+                          onChange={(e) =>
+                            setEditValues((previous) => ({
+                              ...previous,
+                              max_wave_height_ft: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`edit-period-${alert.id}`}>
+                          Minimum Swell Period (seconds)
+                        </label>
+
+                        <input
+                          id={`edit-period-${alert.id}`}
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          required
+                          value={editValues.min_swell_period_s}
+                          onChange={(e) =>
+                            setEditValues((previous) => ({
+                              ...previous,
+                              min_swell_period_s: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      {/* NEW EDIT WIND FIELD */}
+
+                      <div className="form-group">
+                        <label htmlFor={`edit-wind-${alert.id}`}>
+                          Maximum Wind Speed (knots)
+                        </label>
+
+                        <input
+                          id={`edit-wind-${alert.id}`}
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          placeholder="Optional"
+                          value={editValues.max_wind_speed_kn}
+                          onChange={(e) =>
+                            setEditValues((previous) => ({
+                              ...previous,
+                              max_wind_speed_kn: e.target.value,
+                            }))
+                          }
+                        />
+
+                        <small>
+                          Leave blank for no wind restriction.
+                        </small>
+                      </div>
+
+                      <div className="alert-actions">
+
+                        <button
+                          className="primary-button"
+                          type="submit"
+                          disabled={busyAlertId === alert.id}
+                        >
+                          {busyAlertId === alert.id
+                            ? "Saving..."
+                            : "Save Changes"}
+                        </button>
+
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={busyAlertId === alert.id}
+                          onClick={() => setEditingId(null)}
+                        >
+                          Cancel
+                        </button>
+
+                      </div>
+                    </form>
+                  )}
+
+                  {/* NORMAL ALERT BUTTONS */}
+
+                  {editingId !== alert.id &&
+                    deleteConfirmId !== alert.id && (
+                      <div className="alert-actions">
+
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={busyAlertId === alert.id}
+                          onClick={() => startEditing(alert)}
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={busyAlertId === alert.id}
+                          onClick={() => toggleAlert(alert)}
+                        >
+                          {busyAlertId === alert.id
+                            ? "Updating..."
+                            : alert.is_active
+                              ? "Pause"
+                              : "Reactivate"}
+                        </button>
+
+                        <button
+                          className="delete-button"
+                          type="button"
+                          disabled={busyAlertId === alert.id}
+                          onClick={() => {
+                            setEditingId(null);
+                            setAlertError("");
+                            setDeleteConfirmId(alert.id);
+                          }}
+                        >
+                          Delete
+                        </button>
+
+                      </div>
+                    )}
+
+                  {/* DELETE CONFIRMATION */}
+
+                  {deleteConfirmId === alert.id && (
+                    <div className="delete-confirmation">
+
+                      <p>
+                        Permanently delete{" "}
+                        <strong>{alert.name}</strong>?
+                        Its saved matches and notification history
+                        will also be removed.
+                      </p>
+
+                      <div className="alert-actions">
+
+                        <button
+                          className="delete-button"
+                          type="button"
+                          disabled={busyAlertId === alert.id}
+                          onClick={() => deleteAlert(alert.id)}
+                        >
+                          {busyAlertId === alert.id
+                            ? "Deleting..."
+                            : "Yes, Delete"}
+                        </button>
+
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={busyAlertId === alert.id}
+                          onClick={() => setDeleteConfirmId(null)}
+                        >
+                          Cancel
+                        </button>
+
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              ))}
+
+            </div>
+          </section>
+        </>
+      )}
 
     </main>
   );

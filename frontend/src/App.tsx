@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import Dashboard from "./Dashboard";
 import AlertHistory from "./components/AlertHistory";
+import SideNav, { type Page } from "./components/SideNav";
 
 import AuthPage, {
   type AuthenticatedUser,
@@ -16,7 +17,18 @@ type AuthStatus =
   | "unauthenticated"
   | "error";
 
+// Read the current page from the URL, e.g. #/alerts.
+function pageFromHash(): Page {
+  const page = window.location.hash.replace("#/", "");
+
+  return page === "alerts" || page === "history"
+    ? page
+    : "spots";
+}
+
 function App() {
+  const [page, setPage] = useState<Page>(pageFromHash);
+
   const [user, setUser] = useState<AuthenticatedUser | null>(
     null
   );
@@ -77,6 +89,20 @@ function App() {
       controller.abort();
     };
   }, [refreshKey]);
+
+  // -------- FOLLOW SIDE MENU LINKS --------
+
+  useEffect(() => {
+    function handleHashChange() {
+      setPage(pageFromHash());
+    }
+
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
 
   // -------- SUCCESSFUL LOGIN / REGISTRATION --------
 
@@ -208,11 +234,21 @@ function App() {
         </p>
       )}
 
-      {/* Existing surf dashboard */}
-      <Dashboard />
+      <div className="app-layout">
+        <SideNav current={page} />
 
-      {/* History and notification tracking */}
-      <AlertHistory />
+        <div className="app-content">
+          {/* Spots and alerts share one Dashboard instance,
+              so switching between them keeps its state. */}
+          {page === "history" ? (
+            <div className="history-page">
+              <AlertHistory />
+            </div>
+          ) : (
+            <Dashboard view={page} />
+          )}
+        </div>
+      </div>
     </>
   );
 }

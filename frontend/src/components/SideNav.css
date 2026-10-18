@@ -1,0 +1,102 @@
+/* -------- PAGE LAYOUT WITH SIDE MENU -------- */
+
+.app-layout {
+  display: flex;
+  min-height: calc(100vh - 66px);
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-page {
+  padding-top: 24px;
+}
+
+/* -------- SIDE MENU -------- */
+
+.side-nav {
+  flex: 0 0 220px;
+  background: white;
+  border-right: 1px solid #e2e8f0;
+}
+
+.side-nav-inner {
+  position: sticky;
+  top: 0;
+  padding: 28px 14px;
+}
+
+.side-nav-brand {
+  margin: 0 0 20px;
+  padding: 0 14px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #172b3a;
+}
+
+.side-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.side-nav-link {
+  display: block;
+  padding: 11px 14px;
+  border-radius: 8px;
+  color: #334155;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.side-nav-link:hover {
+  background: #f1f5f9;
+}
+
+.side-nav-link.active {
+  background: #eaf6fa;
+  color: #087695;
+}
+
+.side-nav-link:focus-visible {
+  outline: 2px solid #087695;
+  outline-offset: 2px;
+}
+
+/* -------- MOBILE: MENU BECOMES TOP TABS -------- */
+
+@media (max-width: 800px) {
+  .app-layout {
+    flex-direction: column;
+  }
+
+  .side-nav {
+    flex: none;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .side-nav-inner {
+    position: static;
+    padding: 8px 16px;
+  }
+
+  .side-nav-brand {
+    display: none;
+  }
+
+  .side-nav-list {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .side-nav-link {
+    white-space: nowrap;
+  }
+}
