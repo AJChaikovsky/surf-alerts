@@ -86,11 +86,13 @@ async def check_all_alerts():
                     .on_conflict_do_nothing(
                         constraint="uq_alert_matches_alert_time"
                     )
+                    # rowcount is -1 here, so detect inserts
+                    # by whether an id comes back.
+                    .returning(AlertMatch.id)
                 )
 
                 with SessionLocal.begin() as db:
-                    result = db.execute(statement)
-                    inserted = result.rowcount == 1
+                    inserted = db.scalar(statement) is not None
 
                 if inserted:
                     new_matches += 1

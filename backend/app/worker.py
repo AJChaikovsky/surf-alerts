@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -11,6 +12,12 @@ def run_forecast_check():
 
 
 def main():
+    # Show notification logs, including DRY RUN messages.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+
     scheduler = BlockingScheduler(timezone="UTC")
 
     scheduler.add_job(
