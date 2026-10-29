@@ -1,184 +1,185 @@
-/* General page styling */
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f5f8fa;
-  color: #172b3a;
-}
-
-button {
-  font: inherit;
-}
+/* App styles. Colours and type come from theme.css. */
 
 .dashboard {
-  max-width: 1200px;
+  max-width: var(--max-width);
   margin: 0 auto;
-  padding: 40px 24px;
+  padding: 48px 32px 80px;
 }
 
-/* Header */
+/* -------- PAGE HEADER -------- */
 
-header {
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
   margin-bottom: 40px;
 }
 
-header h1 {
-  font-size: 36px;
-  margin-bottom: 8px;
+.page-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 
-header p {
-  color: #64748b;
+.page-subtitle {
+  max-width: 560px;
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.page-header-actions {
+  flex-shrink: 0;
 }
 
 h2 {
-  margin-bottom: 20px;
+  margin: 0 0 20px;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
-/* Surf spot cards */
-
-.spot-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 16px;
-}
+/* -------- SURF SPOTS -------- */
 
 .spot-search {
   display: flex;
   flex-direction: column;
   gap: 8px;
   max-width: 430px;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 
-.spot-search label {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.spot-search input {
-  width: 100%;
-  padding: 12px 14px;
-  font: inherit;
-  font-size: 14px;
-  color: #172b3a;
-  background: white;
-  border: 1px solid #cbd5e1;
-  border-radius: 9px;
-}
-
-.spot-search input:focus-visible {
-  outline: 2px solid #0c7899;
-  outline-offset: 1px;
+.spot-search label,
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
 }
 
 .spot-search-empty {
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .spot-region {
-  margin-bottom: 32px;
+  margin-bottom: 36px;
 }
 
 .spot-region-heading {
   margin: 0 0 14px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #64748b;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.spot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+/* Cards with a cursor spotlight and a slight 3D tilt (see motion.ts). */
+.tilt-card {
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.tilt-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    380px circle at var(--mx, 50%) var(--my, 50%),
+    var(--spot),
+    transparent 45%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tilt-card:hover::after {
+  opacity: 1;
 }
 
 .spot-card {
-  background: white;
-  padding: 24px;
-  border: 2px solid transparent;
-  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 22px;
   text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .spot-card:hover {
-  border-color: #0c7899;
+  border-color: var(--border-light);
 }
 
 .spot-card.selected {
-  border-color: #0c7899;
-  background: #eaf6fa;
+  border-color: var(--accent-border);
+  background: var(--accent-light);
 }
 
 .spot-card h3 {
-  margin-top: 0;
-}
-
-.spot-card p {
-  color: #64748b;
-}
-
-.spot-card span {
-  color: #087695;
+  margin: 0;
+  font-size: 1.05rem;
   font-weight: 600;
 }
 
-/* Forecast section */
+.spot-card p {
+  margin: 0 0 14px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.spot-card .spot-card-link {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+/* -------- FORECAST -------- */
 
 .forecast-section {
   scroll-margin-top: 16px;
-  margin-top: 40px;
+  margin-top: 48px;
 }
 
 .forecast-note {
-  color: #64748b;
-  font-size: 13px;
+  margin: -12px 0 20px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }
 
 .forecast-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
 }
 
-.forecast-card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.forecast-card h3 {
-  margin-top: 0;
-  font-size: 15px;
-}
-
-.forecast-card p {
-  font-size: 14px;
-  color: #475569;
-}
-
-.forecast-card strong {
-  color: #172b3a;
-}
-
-/* Alert sections */
+/* -------- FORMS -------- */
 
 .alert-section {
   margin-top: 48px;
 }
 
-/* Create Alert form */
-
 .alert-form {
-  background: white;
-  padding: 28px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
   max-width: 650px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
 }
 
 .form-group {
@@ -188,26 +189,40 @@ h2 {
   margin-bottom: 20px;
 }
 
-.form-group label {
-  font-weight: 600;
-  font-size: 14px;
+.form-group small {
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.spot-search input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #cbd5e1;
+  padding: 11px 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: white;
-  color: #172b3a;
-  font-size: 15px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group input::placeholder,
+.spot-search input::placeholder {
+  color: var(--text-tertiary);
 }
 
 .form-group input:focus,
-.form-group select:focus {
-  outline: 2px solid #0c7899;
-  outline-offset: 1px;
+.form-group select:focus,
+.spot-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.form-group input:disabled {
+  opacity: 0.6;
 }
 
 .form-row {
@@ -216,54 +231,83 @@ h2 {
   gap: 16px;
 }
 
-/* Buttons */
+/* -------- BUTTONS -------- */
+
+.primary-button,
+.secondary-button,
+.delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+  will-change: transform;
+}
 
 .primary-button {
-  background: #087695;
-  color: white;
-  border: none;
-  padding: 14px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
+  background: var(--heading);
+  color: var(--on-heading);
 }
 
 .primary-button:hover {
-  background: #075d76;
-}
-
-.primary-button:disabled,
-.secondary-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  opacity: 0.85;
 }
 
 .secondary-button {
   margin-top: 12px;
-  background: white;
-  border: 1px solid #cbd5e1;
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .secondary-button:hover {
-  background: #f1f5f9;
+  border-color: var(--border-light);
+  background: var(--surface2);
 }
 
-/* Saved alerts */
+.delete-button {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+
+.delete-button:hover {
+  background: var(--danger-bg);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* -------- SAVED ALERTS -------- */
 
 .saved-alerts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
 }
 
 .saved-alert-card {
-  background: white;
-  padding: 24px;
-  border: 1px solid #e2e8f0;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.saved-alert-card > p {
+  margin: 4px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
 }
 
 .alert-heading {
@@ -271,118 +315,94 @@ h2 {
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .alert-heading h3 {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 .alert-heading p {
   margin: 0;
-  color: #64748b;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
 }
 
-/* NEW: Active / Paused status circles */
-
+/* Status: text plus a coloured dot, never colour alone. */
 .alert-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
   white-space: nowrap;
+  color: var(--text-secondary);
 }
 
 .status-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
-
-/* Green circle for active alerts */
 
 .status-dot.active {
-  background-color: #22c55e;
+  background-color: var(--dot-active);
+  box-shadow: 0 0 0 3px var(--success-bg);
 }
-
-/* Orange circle for paused alerts */
 
 .status-dot.paused {
-  background-color: #f59e0b;
+  background-color: var(--dot-paused);
+  box-shadow: 0 0 0 3px var(--warning-bg);
 }
 
-/* NEW: Inline form notifications */
+/* -------- MESSAGES -------- */
 
 .form-notification {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
   margin-bottom: 16px;
+  padding: 12px 14px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 0.88rem;
   font-weight: 500;
 }
 
-.form-notification-error {
-  background-color: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+.form-notification-error,
+.error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
 }
 
 .form-notification-success {
-  background-color: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  color: var(--green);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
 }
-
-/* General dashboard error messages */
 
 .error {
-  color: #b91c1c;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  padding: 12px;
+  padding: 12px 14px;
   border-radius: 8px;
+  font-size: 0.9rem;
 }
 
-/* Mobile responsiveness */
-
-@media (max-width: 600px) {
-  .dashboard {
-    padding: 24px 16px;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .alert-form {
-    padding: 20px;
-  }
-
-  header h1 {
-    font-size: 30px;
-  }
-}
-
-
-/* -------- EDIT ALERT FORM -------- */
+/* -------- EDIT / DELETE -------- */
 
 .edit-form {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border);
 }
 
 .edit-form .form-group {
   margin-bottom: 16px;
 }
-
-/* -------- ALERT ACTION BUTTONS -------- */
 
 .alert-actions {
   display: flex;
@@ -396,40 +416,19 @@ h2 {
   margin-top: 0;
 }
 
-.delete-button {
-  background: #fff;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.delete-button:hover {
-  background: #fef2f2;
-}
-
-.delete-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* -------- DELETE CONFIRMATION -------- */
-
 .delete-confirmation {
   margin-top: 20px;
   padding: 16px;
-  border: 1px solid #fecaca;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
   border-radius: 8px;
-  background: #fef2f2;
 }
 
 .delete-confirmation p {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.88rem;
   line-height: 1.6;
-  color: #991b1b;
+  color: var(--text);
 }
 
 .delete-confirmation .alert-actions {
@@ -438,7 +437,24 @@ h2 {
 
 /* -------- MOBILE -------- */
 
-@media (max-width: 600px) {
+@media (max-width: 720px) {
+  .dashboard {
+    padding: 28px 16px 64px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .alert-form {
+    padding: 20px;
+  }
+
   .alert-actions {
     gap: 8px;
   }

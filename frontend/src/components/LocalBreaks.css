@@ -1,6 +1,7 @@
 /* Most styles come from the shared form and card classes in index.css. */
 
 .lb-heading {
+  max-width: 650px;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -11,7 +12,7 @@
 .lb-count {
   font-size: 13px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -20,8 +21,8 @@
 .lb-found {
   padding: 16px 18px;
   margin-bottom: 16px;
-  background: #eaf6fa;
-  border: 1px solid #c4e7ef;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
   border-radius: 10px;
 }
 
@@ -39,18 +40,18 @@
 
 .lb-found-values dt {
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .lb-found-values dd {
   margin: 4px 0 0;
   font-size: 18px;
   font-weight: 700;
-  color: #087695;
+  color: var(--accent);
 }
 
 .lb-found small {
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 480px) {

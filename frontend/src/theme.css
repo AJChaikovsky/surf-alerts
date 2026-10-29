@@ -1,0 +1,246 @@
+/* -------- DESIGN TOKENS --------
+   Matches ajchaikovsky.com: warm neutrals, one blue accent, Inter + IBM Plex
+   Mono, expo-out motion. Light by default, dark via the system setting or the
+   theme toggle (data-theme on <html>). Surf-specific tokens are at the end. */
+
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface2: #eeedea;
+  --border: #e0dfdb;
+  --border-light: #d0cfcb;
+  --text: #1a1a1a;
+  --text-secondary: #6b6b6b;
+  --text-tertiary: #999999;
+  --heading: #0a0a0a;
+  --on-heading: #ffffff;
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-light: rgba(29, 78, 216, 0.06);
+  --accent-border: rgba(29, 78, 216, 0.22);
+  --spot: rgba(29, 78, 216, 0.07);
+  --selection: rgba(29, 78, 216, 0.15);
+  --shadow: 0 1px 2px rgba(10, 10, 10, 0.04), 0 4px 16px rgba(10, 10, 10, 0.04);
+
+  /* Status colours */
+  --green: #1a7a0a;
+  --success-bg: rgba(26, 122, 10, 0.07);
+  --success-border: rgba(26, 122, 10, 0.25);
+  --danger: #b91c1c;
+  --danger-bg: rgba(185, 28, 28, 0.06);
+  --danger-border: rgba(185, 28, 28, 0.25);
+  --warning: #b45309;
+  --warning-bg: rgba(180, 83, 9, 0.08);
+  --dot-active: #22c55e;
+  --dot-paused: #f59e0b;
+
+  /* Map pins: spot, the user's local break, matches an alert now */
+  --pin-spot: #1d4ed8;
+  --pin-local: #7c3aed;
+  --pin-match: #16a34a;
+
+  /* Login background glow colours (read by FlowField) */
+  --glow-1: #93c5fd;
+  --glow-2: #a5f3fc;
+  --glow-3: #a5b4fc;
+  --glow-strength: 0.55;
+
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", "Fira Code", monospace;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo.out */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --max-width: 1120px;
+  color-scheme: light;
+}
+
+/* Dark: the same values twice, for the system setting and the toggle. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1a1a1a;
+    --border: #2a2a2a;
+    --border-light: #3a3a3a;
+    --text: #e5e5e5;
+    --text-secondary: #a0a0a0;
+    --text-tertiary: #666666;
+    --heading: #f5f5f5;
+    --on-heading: #0a0a0a;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-light: rgba(37, 99, 235, 0.12);
+    --accent-border: rgba(37, 99, 235, 0.38);
+    --spot: rgba(37, 99, 235, 0.1);
+    --selection: rgba(59, 130, 246, 0.3);
+    --shadow: none;
+    --green: #22c55e;
+    --success-bg: rgba(34, 197, 94, 0.1);
+    --success-border: rgba(34, 197, 94, 0.3);
+    --danger: #f87171;
+    --danger-bg: rgba(248, 113, 113, 0.08);
+    --danger-border: rgba(248, 113, 113, 0.3);
+    --warning: #fbbf24;
+    --warning-bg: rgba(251, 191, 36, 0.1);
+    --pin-spot: #3b82f6;
+    --pin-local: #a78bfa;
+    --pin-match: #22c55e;
+    --glow-1: #1e3a8a;
+    --glow-2: #164e63;
+    --glow-3: #1e40af;
+    --glow-strength: 0.6;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --surface2: #1a1a1a;
+  --border: #2a2a2a;
+  --border-light: #3a3a3a;
+  --text: #e5e5e5;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #666666;
+  --heading: #f5f5f5;
+  --on-heading: #0a0a0a;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-light: rgba(37, 99, 235, 0.12);
+  --accent-border: rgba(37, 99, 235, 0.38);
+  --spot: rgba(37, 99, 235, 0.1);
+  --selection: rgba(59, 130, 246, 0.3);
+  --shadow: none;
+  --green: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.1);
+  --success-border: rgba(34, 197, 94, 0.3);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.08);
+  --danger-border: rgba(248, 113, 113, 0.3);
+  --warning: #fbbf24;
+  --warning-bg: rgba(251, 191, 36, 0.1);
+  --pin-spot: #3b82f6;
+  --pin-local: #a78bfa;
+  --pin-match: #22c55e;
+  --glow-1: #1e3a8a;
+  --glow-2: #164e63;
+  --glow-3: #1e40af;
+  --glow-strength: 0.6;
+  color-scheme: dark;
+}
+
+/* -------- BASE -------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--heading);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+a {
+  color: var(--accent);
+}
+
+::selection {
+  background: var(--selection);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Small mono label above headings, e.g. "01 / Surf Spots". */
+.eyebrow {
+  display: block;
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Split headings: each word/letter is its own span so it can animate. */
+.split-word,
+.split-char {
+  display: inline-block;
+}
+
+/* -------- THEME TOGGLE -------- */
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--border-light);
+}
+
+.theme-toggle .icon-moon,
+:root[data-theme="dark"] .theme-toggle .icon-sun {
+  display: block;
+}
+
+.theme-toggle .icon-sun,
+:root[data-theme="dark"] .theme-toggle .icon-moon {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .icon-sun {
+    display: block;
+  }
+
+  :root:not([data-theme="light"]) .theme-toggle .icon-moon {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

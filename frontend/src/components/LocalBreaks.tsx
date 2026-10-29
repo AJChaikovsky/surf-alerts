@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch } from "../api";
+import { PageHeader, Stagger } from "./Motion";
 import { currentPacificHour } from "../time";
 import type { ForecastHour } from "./ForecastCard";
 import "./LocalBreaks.css";
@@ -266,13 +267,11 @@ export default function LocalBreaks() {
 
   return (
     <main className="dashboard">
-      <header>
-        <h1>Local Breaks</h1>
-        <p>
-          Add up to {MAX_LOCAL_BREAKS} breaks of your own by name and
-          coordinates. Only you can see them.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="03 / Local Breaks"
+        title="Add your own breaks"
+        subtitle={`Add up to ${MAX_LOCAL_BREAKS} breaks by name and coordinates. Only you can see them.`}
+      />
 
       {/* ADD FORM */}
 
@@ -397,7 +396,7 @@ export default function LocalBreaks() {
           )}
 
           <button
-            className="primary-button"
+            className="primary-button magnetic"
             type="submit"
             disabled={saving || atLimit}
           >
@@ -429,7 +428,7 @@ export default function LocalBreaks() {
           </p>
         )}
 
-        <div className="saved-alerts">
+        <Stagger className="saved-alerts">
           {breaks.map((item) => (
             <div className="saved-alert-card" key={item.id}>
               <div className="alert-heading">
@@ -485,7 +484,7 @@ export default function LocalBreaks() {
               )}
             </div>
           ))}
-        </div>
+        </Stagger>
       </section>
     </main>
   );

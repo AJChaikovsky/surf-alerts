@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api";
+import { PageHeader, Stagger } from "./Motion";
 import "./AlertHistory.css";
 
 type SavedAlert = {
@@ -209,19 +210,14 @@ export default function AlertHistory() {
 
 
   return (
-    <section className="ah-section">
-      <div className="ah-section-header">
-        <div>
-          <h2>Alert History</h2>
-
-          <p>
-            Review saved surf matches and email
-            notification attempts.
-          </p>
-        </div>
-
+    <section className="dashboard ah-section">
+      <PageHeader
+        eyebrow="05 / Alert History"
+        title="What the worker found"
+        subtitle="Saved surf matches and email attempts for each of your alerts."
+      >
         <button
-          className="ah-refresh-button"
+          className="secondary-button"
           type="button"
           onClick={() =>
             setRefreshVersion((previous) => previous + 1)
@@ -230,7 +226,7 @@ export default function AlertHistory() {
         >
           Refresh History
         </button>
-      </div>
+      </PageHeader>
 
       {listLoading && (
         <p className="ah-muted">Loading alerts...</p>
@@ -325,7 +321,7 @@ export default function AlertHistory() {
           {!historyLoading &&
             !historyError &&
             visibleHistory && (
-              <div className="ah-columns">
+              <Stagger className="ah-columns" replayKey={visibleHistory.alert_id}>
 
                 {/* NOTIFICATION HISTORY */}
 
@@ -454,7 +450,7 @@ export default function AlertHistory() {
                   )}
                 </div>
 
-              </div>
+              </Stagger>
             )}
         </>
       )}

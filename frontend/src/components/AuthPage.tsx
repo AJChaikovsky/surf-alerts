@@ -1,5 +1,21 @@
+import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 
-import { useState, type FormEvent } from "react";
+import { animate, gsap, revealName, riseIn } from "../motion";
+import FlowField from "./FlowField";
+import { SplitText } from "./Motion";
+import RollingWord from "./RollingWord";
+import ThemeToggle from "./ThemeToggle";
+
+// Breaks the headline rolls through.
+const HEADLINE_SPOTS = [
+  "El Porto",
+  "Trestles",
+  "Rincon",
+  "Malibu",
+  "Swami's",
+  "The Wedge",
+  "Black's",
+];
 
 export type AuthenticatedUser = {
   id: number;
@@ -25,6 +41,34 @@ export default function AuthPage({
   const [error, setError] = useState("");
 
   const isRegistering = mode === "register";
+
+  const heroRef = useRef<HTMLDivElement | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
+
+  // Entrance: the name letter by letter, the headline blurring in, then
+  // the details and the form (HyperFrames: overlap, don't run in sequence).
+  useLayoutEffect(() => {
+    const hero = heroRef.current;
+
+    if (!hero) return;
+
+    revealName(hero.querySelectorAll(".auth-name .split-char"));
+
+    if (animate) {
+      gsap.fromTo(
+        hero.querySelector("h1"),
+        { opacity: 0, filter: "blur(8px)" },
+        { opacity: 1, filter: "blur(0px)", duration: 0.6, delay: 0.25, ease: "expo.out", clearProps: "filter" }
+      );
+      gsap.fromTo(
+        hero.querySelectorAll(".auth-tagline, .auth-features li"),
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.8, stagger: 0.06, delay: 0.45, ease: "expo.out", clearProps: "transform" }
+      );
+    }
+
+    riseIn(cardRef.current, 0.35);
+  }, []);
 
   function changeMode(nextMode: AuthMode) {
     setMode(nextMode);
@@ -124,67 +168,45 @@ export default function AuthPage({
 
   return (
     <div className="auth-page">
+      <FlowField className="auth-canvas" />
+
+      <div className="auth-top">
+        <span className="auth-wordmark">~/surf-alerts</span>
+        <ThemeToggle />
+      </div>
+
       <div className="auth-layout">
 
-        {/* LEFT SIDE: BRANDING */}
+        {/* HERO */}
 
-        <section className="auth-hero">
-          <div className="auth-brand">
-            <span className="auth-brand-icon" aria-hidden="true">
-              🌊
-            </span>
-            <span>Surf Alerts</span>
-          </div>
+        <div className="auth-hero" ref={heroRef}>
+          <span className="auth-name">
+            <SplitText text="Surf Alerts" mode="chars" />
+          </span>
 
-          <div className="auth-hero-content">
-            <span className="auth-eyebrow">
-              YOUR PERSONAL SURF COMPANION
-            </span>
+          <h1>
+            Tell me when
+            <br />
+            <RollingWord words={HEADLINE_SPOTS} />
+            <br />
+            is firing.
+          </h1>
 
-            <h1>
-              Spend less time checking forecasts.
-              <br />
-              <span>More time surfing.</span>
-            </h1>
-
-            <p>
-              Track your favorite surf spots, set your
-              ideal wave and wind conditions, and get
-              notified when the forecast matches.
-            </p>
-
-            <div className="auth-feature-list">
-              <div>
-                <span aria-hidden="true">✓</span>
-                Live marine and wind forecasts
-              </div>
-
-              <div>
-                <span aria-hidden="true">✓</span>
-                Personalized surf conditions
-              </div>
-
-              <div>
-                <span aria-hidden="true">✓</span>
-                Automated surf notifications
-              </div>
-            </div>
-          </div>
-
-          <p className="auth-hero-footer">
-            Built for surfers who know what they're looking for.
+          <p className="auth-tagline">
+            Pick your breaks, set the wave height, swell period, and wind
+            you want, and get an email when the forecast lines up.
           </p>
-        </section>
 
-        {/* RIGHT SIDE: AUTHENTICATION FORM */}
+          <ul className="auth-features">
+            <li>Live marine and wind forecasts for 17 SoCal breaks</li>
+            <li>Alerts checked every 30 minutes</li>
+            <li>One email per alert per day, never spam</li>
+          </ul>
+        </div>
 
-        <section className="auth-panel">
-          <div className="auth-card">
+        {/* FORM */}
 
-            <div className="auth-mobile-brand">
-              🌊 Surf Alerts
-            </div>
-
+        <section className="auth-card" ref={cardRef}>
             <h2>
               {isRegistering
                 ? "Create your account"
@@ -276,6 +298,12 @@ export default function AuthPage({
               </div>
 
               {isRegistering && (
+                <p className="auth-hint">
+                  At least 10 characters. A short phrase works well.
+                </p>
+              )}
+
+              {isRegistering && (
                 <div className="auth-field">
                   <label htmlFor="auth-confirm">
                     Confirm password
@@ -307,7 +335,7 @@ export default function AuthPage({
               )}
 
               <button
-                className="auth-submit"
+                className="auth-submit magnetic"
                 type="submit"
                 disabled={loading}
               >
@@ -340,11 +368,9 @@ export default function AuthPage({
             </p>
 
             <p className="auth-disclaimer">
-              This is a local development version of
-              Surf Alerts.
+              Forecasts are modeled estimates. Always check
+              conditions at the beach.
             </p>
-
-          </div>
         </section>
 
       </div>

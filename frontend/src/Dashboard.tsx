@@ -3,6 +3,7 @@ import ForecastCard, {
   type ForecastHour,
 } from "./components/ForecastCard";
 import { apiFetch } from "./api";
+import { PageHeader, Stagger } from "./components/Motion";
 import { currentPacificHour } from "./time";
 
 export type DashboardView = "spots" | "alerts";
@@ -485,21 +486,23 @@ function App({ view }: { view: DashboardView }) {
   return (
     <main className="dashboard">
 
-      {/* HEADER */}
+      {/* HEADER (keyed so its entrance replays when switching pages) */}
 
-      <header>
-        {view === "spots" ? (
-          <>
-            <h1>Surf Forecasts</h1>
-            <p>Pick a surf spot to see its upcoming hourly forecast.</p>
-          </>
-        ) : (
-          <>
-            <h1>My Alerts</h1>
-            <p>Create surf alerts and manage the conditions you're watching for.</p>
-          </>
-        )}
-      </header>
+      {view === "spots" ? (
+        <PageHeader
+          key="spots"
+          eyebrow="01 / Surf Spots"
+          title="Find your break"
+          subtitle="Pick your favorite breaks and know when they're firing!"
+        />
+      ) : (
+        <PageHeader
+          key="alerts"
+          eyebrow="04 / My Alerts"
+          title="Your surf alerts"
+          subtitle="Describe the conditions you want. The worker checks every 30 minutes and emails you when they line up."
+        />
+      )}
 
       {dashboardError && (
         <p className="error" role="alert">
@@ -512,8 +515,6 @@ function App({ view }: { view: DashboardView }) {
           {/* SURF SPOTS */}
 
           <section>
-            <h2>Surf Spots</h2>
-
             <div className="spot-search">
               <label htmlFor="spot-search">Search spots</label>
 
@@ -539,24 +540,26 @@ function App({ view }: { view: DashboardView }) {
               <div className="spot-region" key={group.region}>
                 <h3 className="spot-region-heading">{group.region}</h3>
 
-                <div className="spot-grid">
+                <Stagger className="spot-grid">
                   {group.spots.map((spot) => (
                     <button
                       key={spot.id}
                       type="button"
                       className={
                         selectedSpot?.id === spot.id
-                          ? "spot-card selected"
-                          : "spot-card"
+                          ? "spot-card tilt-card selected"
+                          : "spot-card tilt-card"
                       }
                       onClick={() => selectSpot(spot)}
                     >
                       <h3>{spot.name}</h3>
-                      <p>{spot.region}</p>
-                      <span>View Forecast →</span>
+                      <p>{spot.is_custom ? "Your local break" : spot.region}</p>
+                      <span className="spot-card-link">
+                        {selectedSpot?.id === spot.id ? "Showing forecast ↓" : "View forecast →"}
+                      </span>
                     </button>
                   ))}
-                </div>
+                </Stagger>
               </div>
             ))}
           </section>
@@ -585,14 +588,18 @@ function App({ view }: { view: DashboardView }) {
               {forecast.length === 0 ? (
                 <p>No upcoming forecast data available.</p>
               ) : (
-                <div className="forecast-grid">
+                <Stagger
+                  className="forecast-grid"
+                  replayKey={selectedSpot.id}
+                  stagger={0.04}
+                >
                   {forecast.map((hour) => (
                     <ForecastCard
                       key={hour.time}
                       forecast={hour}
                     />
                   ))}
-                </div>
+                </Stagger>
               )}
             </section>
           )}
@@ -770,7 +777,7 @@ function App({ view }: { view: DashboardView }) {
               )}
 
               <button
-                className="primary-button"
+                className="primary-button magnetic"
                 type="submit"
                 disabled={savingAlert || spots.length === 0}
               >
@@ -799,8 +806,7 @@ function App({ view }: { view: DashboardView }) {
               </p>
             )}
 
-            <div className="saved-alerts">
-
+            <Stagger className="saved-alerts">
               {alerts.map((alert) => (
                 <div
                   className="saved-alert-card"
@@ -1104,8 +1110,7 @@ function App({ view }: { view: DashboardView }) {
 
                 </div>
               ))}
-
-            </div>
+            </Stagger>
           </section>
         </>
       )}

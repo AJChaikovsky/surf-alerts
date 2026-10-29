@@ -23,14 +23,17 @@ This document describes what the app does, how it works, where it stands, and wh
 - ✅ 17 Southern California breaks with search and region grouping.
 - ✅ Local Breaks: each user can add up to 3 private breaks of their own.
 - ✅ Interactive map of every spot, with current conditions and alert-match colors.
-- 🔶 Ready to deploy on Fly.io: production image tested locally against a fresh database.
+- ✅ Live on Fly.io at https://surf-alerts.fly.dev, with Neon Postgres.
+- ✅ Redesign matching my portfolio (ajchaikovsky.com): its design tokens, light/dark themes, and HyperFrames-style motion.
 - ⬜ Live deployment, README screenshots and demo.
 
 ### Resume here (October 29, 2026)
 
 Everything is committed and pushed to `main`. The backend tests (74), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
 
-**In progress: going live on Fly.io.** The code side is done (`Dockerfile`, `fly.toml`, `app/server.py`). The remaining steps need my Fly account and are in the README under **Deploying to Fly.io**: install `flyctl`, log in, create the app and a Postgres database, set secrets, `fly deploy`, then `fly scale count app=1 worker=1`.
+**Live:** https://surf-alerts.fly.dev runs on Fly.io (one `app` machine and one `worker`) with a free Neon Postgres database in AWS US West. Deploy changes with `fly deploy` from the repo root; logs with `fly logs`. Production emails are off until the Resend domain is verified.
+
+**Redesign:** committed to `main` (portfolio styling, light/dark, HyperFrames-style motion). Run `fly deploy` to put it on the live site if it isn't there yet.
 
 **In progress: verifying my email domain in Resend.** I'm adding Resend's DNS records at my domain provider:
 - TXT `resend._domainkey.surf-alerts`;
@@ -78,6 +81,19 @@ Forecast values are **modeled estimates**, not guarantees of breaking-wave heigh
 11. **Alert History:** Choose an alert to see its saved matching forecast hours and every email attempt with its status.
 12. **Coming back:** Everything is stored in PostgreSQL. Logging out ends the session; logging back in shows only that account's alerts.
 
+### Look and feel
+
+The design matches my portfolio, [ajchaikovsky.com](https://ajchaikovsky.com): warm neutrals with one blue accent, Inter for text and IBM Plex Mono for labels, and light and dark themes (following the system setting, with a toggle that remembers the choice). The motion follows the guidance in [HyperFrames](https://github.com/heygen-com/hyperframes)' motion guide, the same rules my portfolio uses:
+
+- Arrivals land on a long `expo.out` tail; exits are about half as long.
+- Page titles blur in word by word, then hold still. The app name on the login page arrives letter by letter.
+- Changing pages is a "blur swap": the new page sharpens in while the toolbar and side menu stay put.
+- Lists of cards stagger in 40-80 ms apart, including cards that arrive later from the API.
+- Spot cards have a cursor spotlight and a slight 3D tilt; primary buttons are magnetic.
+- The side menu's highlight slides to the current page.
+- The login page has a flowing colour field in WebGL behind it (a port of my portfolio's hero background, standing in for HyperFrames' aurora shader blocks), and its headline rolls through spot names like a slot machine.
+- No floating, pulsing, or bouncing UI, and all motion is turned off for people who've asked for reduced motion.
+
 ### Interface details
 
 - Validation and success messages appear next to the form, not at the top of the page.
@@ -121,6 +137,7 @@ Forecast values are **modeled estimates**, not guarantees of breaking-wave heigh
 | Frontend | React + TypeScript + Vite | Pages, login/register, alert forms, history |
 | Styling | Plain CSS | Responsive spot cards, forms, status indicators, side menu |
 | Map | Leaflet + react-leaflet, OpenStreetMap tiles | Interactive spot map |
+| Motion | GSAP | Page, title, list, and pointer animations |
 | API | Python 3.12 + FastAPI | REST endpoints, validation, authentication, authorization |
 | Schemas | Pydantic v2 | Request/response validation |
 | Database | PostgreSQL 17 | Users, spots, alerts, matches, deliveries |
@@ -253,11 +270,17 @@ surf-alerts/
         ├── Dashboard.tsx           # Surf Spots and My Alerts pages
         ├── api.ts                  # apiFetch: CSRF header, session-ended handling
         ├── time.ts                 # Current Pacific hour, for picking forecast hours
+        ├── theme.css               # Design tokens (light/dark), base type, theme toggle
+        ├── motion.ts               # Every animation: timings, reduced motion, card tilt, magnetic buttons
         ├── compass.ts              # Degrees to compass directions
         ├── index.css
         ├── auth.css
         └── components/
             ├── AuthPage.tsx        # Login / registration
+            ├── FlowField.tsx       # WebGL flowing colour background (login page)
+            ├── RollingWord.tsx     # Slot-machine word in the login headline
+            ├── Motion.tsx          # SplitText, PageHeader, Stagger
+            ├── ThemeToggle.tsx     # Light/dark toggle
             ├── SideNav.tsx         # Side menu
             ├── SideNav.css
             ├── ForecastCard.tsx    # One forecast hour
@@ -674,10 +697,11 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 | Surf spots | 17 Southern California breaks, search, region grouping | ✅ |
 | Local breaks | Up to 3 private breaks per user, on their own page | ✅ |
 | Map | Spot map with current conditions, alert-match colors, and Add to alerts | ✅ |
+| Design | Portfolio design tokens, light/dark themes, HyperFrames-style motion | ✅ |
 | CSRF protection | Signed double-submit token | ✅ |
 | Rate limiting | Login and registration limits | ✅ |
 | Session hardening | Server-side revocation, security logging | ✅ |
-| Deployment | Fly.io app and worker, Postgres, production image | 🔶 Code ready and tested locally |
+| Deployment | Fly.io app and worker, Neon Postgres, production image | ✅ https://surf-alerts.fly.dev |
 | README and demo | Setup guide, screenshots, demo recording | ⬜ |
 
 ---

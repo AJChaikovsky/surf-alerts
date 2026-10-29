@@ -30,21 +30,28 @@ function formatValue(
 }
 
 // Convert the hourly API timestamp to readable time
-function formatTime(time: string): string {
-  const parts = time.split("T");
+// "2026-10-29T15:00" -> { time: "3:00 PM", day: "Thu, Oct 29" }
+function formatTime(value: string): { time: string; day: string } {
+  const parts = value.split("T");
 
   if (parts.length !== 2) {
-    return time;
+    return { time: value, day: "" };
   }
 
-  const [year, month, day] = parts[0].split("-");
+  const [year, month, day] = parts[0].split("-").map(Number);
   const [hour, minute] = parts[1].split(":");
 
   const hourNumber = Number(hour);
   const period = hourNumber >= 12 ? "PM" : "AM";
   const displayHour = hourNumber % 12 || 12;
 
-  return `${month}/${day}/${year} · ${displayHour}:${minute} ${period}`;
+  const date = new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  return { time: `${displayHour}:${minute} ${period}`, day: date };
 }
 
 function DirectionValue({
@@ -69,8 +76,10 @@ export default function ForecastCard({
   return (
     <article className="surf-forecast-card">
       <div className="surf-forecast-header">
-        <h3>{formatTime(forecast.time)}</h3>
-        <span className="surf-forecast-label">Hourly</span>
+        <h3>{formatTime(forecast.time).time}</h3>
+        <span className="surf-forecast-label">
+          {formatTime(forecast.time).day}
+        </span>
       </div>
 
       <div className="surf-forecast-primary">

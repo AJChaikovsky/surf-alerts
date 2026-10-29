@@ -10,6 +10,7 @@ import { latLngBounds } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { apiFetch } from "../api";
+import { PageHeader } from "./Motion";
 import { compassDirection } from "../compass";
 import { currentPacificHour } from "../time";
 import type { ForecastHour } from "./ForecastCard";
@@ -244,13 +245,11 @@ export default function SpotMap() {
 
   return (
     <main className="dashboard">
-      <header>
-        <h1>Surf Map</h1>
-        <p>
-          Tap a spot for its current forecast. Green spots match one of
-          your active alerts right now.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="02 / Map"
+        title="Surf map"
+        subtitle="Tap a spot for its current forecast. Green spots match one of your active alerts right now."
+      />
 
       {spotsError && (
         <p className="error" role="alert">
@@ -315,6 +314,12 @@ export default function SpotMap() {
                   weight: 2,
                   fillColor: color,
                   fillOpacity: 0.95,
+                  // Themed colours from SpotMap.css; fillColor is the fallback.
+                  className: isMatching
+                    ? "pin pin-match"
+                    : spot.is_custom
+                      ? "pin pin-local"
+                      : "pin pin-spot",
                 }}
                 eventHandlers={{ click: () => void loadForecast(spot) }}
               >

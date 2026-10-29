@@ -1,12 +1,14 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import Dashboard from "./Dashboard";
 import AlertHistory from "./components/AlertHistory";
 import LocalBreaks from "./components/LocalBreaks";
 import SpotMap from "./components/SpotMap";
 import SideNav, { type Page } from "./components/SideNav";
+import ThemeToggle from "./components/ThemeToggle";
 import { apiFetch, SESSION_EXPIRED_EVENT } from "./api";
+import { blurSwapIn, installPointerEffects } from "./motion";
 
 import AuthPage, {
   type AuthenticatedUser,
@@ -94,6 +96,20 @@ function App() {
     };
   }, [refreshKey]);
 
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  // -------- POINTER EFFECTS (card tilt, magnetic buttons) --------
+
+  useEffect(() => installPointerEffects(), []);
+
+  // -------- PAGE TRANSITION --------
+  // Blur swap on one stage: the new page sharpens in; the toolbar and side
+  // menu stay put.
+
+  useLayoutEffect(() => {
+    blurSwapIn(contentRef.current);
+  }, [page, authStatus]);
+
   // -------- FOLLOW SIDE MENU LINKS --------
 
   useEffect(() => {
@@ -173,7 +189,7 @@ function App() {
     return (
       <div className="auth-loading-screen">
         <div className="auth-loading-content">
-          <span className="auth-loading-wave">🌊</span>
+          <span className="auth-loading-mark">~/surf-alerts</span>
           <h2>Surf Alerts</h2>
           <p>Checking your session...</p>
         </div>
@@ -225,25 +241,33 @@ function App() {
     <>
       <div className="session-toolbar">
         <div className="session-toolbar-content">
-          <div className="session-user">
-            <span
-              className="session-indicator"
-              aria-hidden="true"
-            />
+          <a className="session-wordmark" href="#/spots">
+            ~/surf-alerts
+          </a>
 
-            <span className="session-email">
-              {user.email}
-            </span>
+          <div className="session-right">
+            <div className="session-user">
+              <span
+                className="session-indicator"
+                aria-hidden="true"
+              />
+
+              <span className="session-email">
+                {user.email}
+              </span>
+            </div>
+
+            <ThemeToggle />
+
+            <button
+              type="button"
+              className="logout-button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+            >
+              {loggingOut ? "Logging out..." : "Log Out"}
+            </button>
           </div>
-
-          <button
-            type="button"
-            className="logout-button"
-            onClick={handleLogout}
-            disabled={loggingOut}
-          >
-            {loggingOut ? "Logging out..." : "Log Out"}
-          </button>
         </div>
       </div>
 
@@ -259,7 +283,7 @@ function App() {
       <div className="app-layout">
         <SideNav current={page} />
 
-        <div className="app-content">
+        <div className="app-content" ref={contentRef}>
           {/* Spots and alerts share one Dashboard instance,
               so switching between them keeps its state. */}
           {page === "history" ? (
