@@ -44,8 +44,8 @@ export default function AuthPage({
       return;
     }
 
-    if (isRegistering && password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (isRegistering && password.length < 10) {
+      setError("Password must be at least 10 characters.");
       return;
     }
 
@@ -93,8 +93,13 @@ export default function AuthPage({
         }
 
         if (response.status === 422) {
+          // Password rules come back as a readable message.
+          const data = await response.json().catch(() => null);
+
           throw new Error(
-            "Please check your email and password."
+            typeof data?.detail === "string"
+              ? data.detail
+              : "Please check your email and password."
           );
         }
 
@@ -263,7 +268,7 @@ export default function AuthPage({
                   onChange={(event) =>
                     setPassword(event.target.value)
                   }
-                  minLength={isRegistering ? 8 : undefined}
+                  minLength={isRegistering ? 10 : undefined}
                   maxLength={isRegistering ? 128 : undefined}
                   required
                   disabled={loading}

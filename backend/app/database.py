@@ -9,7 +9,17 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(env_path)
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+def normalize_database_url(url: str) -> str:
+    # Hosts such as Fly.io hand out postgres:// URLs; SQLAlchemy
+    # needs the driver named explicitly to use psycopg 3.
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+
+    return url
+
+
+DATABASE_URL = normalize_database_url(os.environ["DATABASE_URL"])
 
 # Create database engine
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)

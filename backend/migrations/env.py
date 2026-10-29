@@ -21,7 +21,8 @@ if config.config_file_name is not None:
 from app.database import Base, DATABASE_URL
 from app.models import SurfSpot
 
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+# Escape % so URL-encoded passwords survive configparser interpolation.
+config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 
 target_metadata = Base.metadata
 

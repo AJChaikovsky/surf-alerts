@@ -1,0 +1,16 @@
+# Secrets and local environments never go into the image.
+**/.env
+**/.venv
+**/node_modules
+
+# Build output and caches; the image builds its own.
+frontend/dist
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+
+# Not needed to run the app.
+.git
+docs
+backend/tests
+**/.DS_Store

@@ -1,0 +1,44 @@
+# Fly.io configuration for Surf Alerts.
+# Secrets (JWT_SECRET_KEY, RESEND_API_KEY, EMAIL_FROM, DATABASE_URL,
+# EMAIL_NOTIFICATIONS_ENABLED) are set with `fly secrets set`, not here.
+
+# App names are global on Fly; change this if it's taken.
+app = "surf-alerts"
+primary_region = "lax"
+
+[build]
+
+[deploy]
+  # Runs before each release goes live.
+  release_command = "sh -c 'alembic upgrade head && python -m app.seed'"
+
+[env]
+  COOKIE_SECURE = "true"
+  MAX_EMAILS_PER_CHECK = "25"
+
+[processes]
+  # The website and API, on one origin.
+  app = "uvicorn app.server:application --host 0.0.0.0 --port 8080 --proxy-headers --forwarded-allow-ips *"
+  # Always on: checks every active alert every 30 minutes.
+  worker = "python -m app.worker"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # The website sleeps when idle and wakes on the next request.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["app", "worker"]

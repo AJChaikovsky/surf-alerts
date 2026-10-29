@@ -23,47 +23,31 @@ This document describes what the app does, how it works, where it stands, and wh
 - ✅ 17 Southern California breaks with search and region grouping.
 - ✅ Local Breaks: each user can add up to 3 private breaks of their own.
 - ✅ Interactive map of every spot, with current conditions and alert-match colors.
-- ⬜ Deployment, README and demo.
+- 🔶 Ready to deploy on Fly.io: production image tested locally against a fresh database.
+- ⬜ Live deployment, README screenshots and demo.
 
-### Resume here (paused October 18, 2026)
+### Resume here (October 29, 2026)
 
-Everything is committed and pushed to `main`. The database is at migration `c532fa799b65`, and the backend tests (63), lint, and build all pass. To start the app again, follow the **Running it locally** steps in the [README](../README.md).
+Everything is committed and pushed to `main`. The backend tests (74), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
 
-**In progress: verifying my email domain in Resend.** I started adding `surf-alerts.<my domain>` under Resend → Domains, but haven't added the DNS records yet. To finish:
+**In progress: going live on Fly.io.** The code side is done (`Dockerfile`, `fly.toml`, `app/server.py`). The remaining steps need my Fly account and are in the README under **Deploying to Fly.io**: install `flyctl`, log in, create the app and a Postgres database, set secrets, `fly deploy`, then `fly scale count app=1 worker=1`.
 
-1. In my domain's DNS settings, add the records Resend lists, copying each value with its copy button rather than retyping it:
-   - TXT `resend._domainkey.surf-alerts` (DKIM);
-   - CNAME `rsend.surf-alerts`;
-   - CNAME `send.surf-alerts`;
-   - optionally, TXT `_dmarc`, unless the domain already has one.
-2. Enter names exactly as shown, since most providers add the domain themselves. On Cloudflare, set the CNAMEs to "DNS only". Leave "Enable Receiving" off.
-3. Click **Verify DNS Records** in Resend. This can take minutes to a few hours.
-4. Once verified, change `EMAIL_FROM` in `backend/.env` to an address on that domain, e.g. `Surf Alerts <alerts@surf-alerts.<my domain>>`.
-5. Do one controlled send to an account whose email *isn't* my Resend login, to prove other users can receive alerts.
+**In progress: verifying my email domain in Resend.** I'm adding Resend's DNS records at my domain provider:
+- TXT `resend._domainkey.surf-alerts`;
+- CNAME `rsend.surf-alerts`;
+- CNAME `send.surf-alerts`;
+- optionally, TXT `_dmarc`.
 
-**Next: deployment prep** (code only; none of it needs a hosting account):
+Copy each value with Resend's copy button, and on Cloudflare set the CNAMEs to "DNS only". Once Resend says Verified, switch production to it with the `fly secrets set EMAIL_FROM=… EMAIL_NOTIFICATIONS_ENABLED=true` command in the README, and do one test send to an account that isn't my Resend login. Production starts with emails off, because until the domain is verified sends to other people fail, and a failed send blocks that alert for the day.
 
-1. Serve the built React app from FastAPI in production, so the site and API share one origin. Separate subdomains on a free host count as different sites, and the browser wouldn't send the `SameSite=Lax` session cookie.
-2. Production settings:
-   - `COOKIE_SECURE=true`;
-   - uvicorn `--proxy-headers`, so rate limits see real IPs;
-   - read the host's `DATABASE_URL` format;
-   - run migrations and the seed on deploy.
-3. Add a one-shot worker command (`python -m app.worker --once`) for a scheduled job every 30 minutes.
-4. Add a password policy, and check that no secrets reach the frontend bundle.
+**Things to remember:**
 
-Then pick a host (Render, Railway, or Fly.io) for the web service, PostgreSQL, and the scheduled job.
-
-**Things to remember when I come back:**
-
-- **`backend/.env` currently has `EMAIL_NOTIFICATIONS_ENABLED=true`.** Any worker run sends real emails. Set it back to `false` unless I'm deliberately testing a send.
-- Until the domain is verified, Resend only delivers to my Resend login's address; sends to anyone else are recorded as `failed`.
-- A `failed` or `sent` delivery blocks any further email for that alert and surf day. To test a send on a day that's already used, create a new alert.
-- Alert 9 ("Email Notification Test") is paused.
-- Activate `backend/.venv` in every new terminal.
-- After big frontend changes, hard-refresh the browser (Cmd+Shift+R).
-- Rate-limit counters (logins, local-break adds) live in memory and reset when the API restarts.
-- `requirements.txt` was regenerated from the working environment, so a fresh `pip install -r requirements.txt` works. It had been missing the login packages.
+- **Local `backend/.env` has `EMAIL_NOTIFICATIONS_ENABLED=true`**, so a local worker run sends real emails. Production's setting is separate (a Fly secret).
+- Production uses its own JWT secret, so local and production sessions are unrelated.
+- Keep production at one `app` and one `worker` machine. Rate limits are in memory, and a second worker would repeat every check.
+- A `failed` or `sent` delivery blocks more emails for that alert and surf day.
+- The map uses OpenStreetMap's public tiles; switch to a tile provider if traffic grows.
+- Activate `backend/.venv` in every new terminal, and hard-refresh the browser after big frontend changes.
 
 ---
 
@@ -221,7 +205,10 @@ The Alembic directory is `migrations/`, not `alembic/`.
 ```text
 surf-alerts/
 ├── .gitignore
-├── README.md                   # What it is and how to run it
+├── README.md                   # What it is, how to run it, how to deploy it
+├── Dockerfile                  # Production image: builds the frontend, runs FastAPI
+├── .dockerignore               # Keeps .env, virtualenvs, and tests out of the image
+├── fly.toml                    # Fly.io: app and worker processes, release command
 ├── docs/
 │   └── BUILD_PLAN.md               # This file
 ├── backend/
@@ -233,6 +220,7 @@ surf-alerts/
 │   │   └── versions/               # Schema migrations
 │   ├── app/
 │   │   ├── main.py                 # Routes, ownership checks, CSRF middleware
+│   │   ├── server.py               # Production entry point: frontend at /, API at /api
 │   │   ├── auth.py                 # Register/login/me/logout, cookies, CSRF, rate limits
 │   │   ├── database.py             # Engine, sessions, Base, get_db
 │   │   ├── models.py               # User, UserSession, SurfSpot, Alert, AlertMatch, NotificationDelivery
@@ -292,6 +280,7 @@ surf-alerts/
 - **`AuthPage.tsx`** handles login and registration, with errors shown next to the form.
 - **`ForecastCard.tsx`** displays one forecast hour with units and compass directions.
 - **`api.ts`** provides `apiFetch`, which every signed-in page uses: it adds the `X-CSRF-Token` header to state-changing requests, and on a 401 it tells `App` to show the login page, so a tab whose session ended (for example, logged out in another tab) returns to login on its next request.
+- **`server.py`** is the production entry point. It serves the built React app at `/` and passes `/api/...` requests to the FastAPI app with the prefix removed, matching Vite's development proxy, so the site and API share one origin and the session cookie always reaches the API.
 - **`main.py`** holds thin route handlers that enforce login, ownership, and CSRF, and hand forecast and matching work to the services.
 - **`auth.py`** handles password hashing, session and CSRF cookies, rate limiting, and the current-user dependency.
 - **`forecast.py`** fetches marine and weather data and merges them hour by hour.
@@ -535,7 +524,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 
 ### How it works
 
-- **Passwords** are hashed with Argon2 and never stored.
+- **Passwords** are hashed with Argon2 and never stored. New passwords must be at least 10 characters, can't be a common password, and can't contain the email's username (length plus a blocklist, following NIST SP 800-63B, rather than symbol rules). Existing passwords still work.
 - **Sessions** are signed JWTs (user id, session id, 7-day expiry) in an `HttpOnly`, `SameSite=Lax` cookie, which JavaScript can't read. The `Secure` flag is controlled by `COOKIE_SECURE` and must be on under HTTPS.
 - **Server-side revocation:** every login creates a `user_sessions` row, and every request checks that the token's session exists and hasn't been revoked. Logout revokes it, so a copied token stops working immediately, while the user's other devices stay signed in.
 - **CSRF protection** uses a signed double-submit token. At login the server also sets a readable `csrf_token` cookie, an HMAC-SHA256 of the session token keyed with the server secret. The frontend sends it back in `X-CSRF-Token` on every change, and middleware rejects mismatches with 403. Because the token is tied to the session, one session's token can't be used with another. `/auth/me` refreshes the cookie, so sessions that existed before CSRF protection keep working.
@@ -558,7 +547,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 
 ## 11. Testing
 
-### Automated tests (63 passing)
+### Automated tests (74 passing)
 
 | File | Covers |
 |---|---|
@@ -571,7 +560,8 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 | `test_local_breaks.py` | Breaks are private (other users and anonymous visitors can't see, forecast, use, or delete them); 3-per-user limit; deleting frees a slot; land points rejected; can't delete a break an alert uses; curated spots can't be deleted; add attempts rate-limited |
 | `test_notification_email.py` | Email averages for waves, swell period, and wind; missing values skipped or shown as N/A; hour list truncation; HTML escaping |
 | `test_current_matches.py` | Only spots where an alert matches the current hour; only the matching alerts listed; paused and other users' alerts ignored; a failed forecast is skipped; login required |
-| `test_security.py` | CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected. Security log: events recorded, no passwords or tokens |
+| `test_server.py` | Production entry point: frontend at `/`, assets, API under `/api`, login and CSRF through the prefix, JSON 404s |
+| `test_security.py` | Password policy: length, common passwords, email username, existing passwords still log in. CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected. Security log: events recorded, no passwords or tokens |
 
 The tests run against an in-memory SQLite database, so PostgreSQL-specific behavior such as `ON CONFLICT` is verified by running the real worker.
 
@@ -687,7 +677,7 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 | CSRF protection | Signed double-submit token | ✅ |
 | Rate limiting | Login and registration limits | ✅ |
 | Session hardening | Server-side revocation, security logging | ✅ |
-| Deployment | Hosted frontend, API, database, worker | ⬜ |
+| Deployment | Fly.io app and worker, Postgres, production image | 🔶 Code ready and tested locally |
 | README and demo | Setup guide, screenshots, demo recording | ⬜ |
 
 ---
@@ -780,10 +770,10 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 - [x] History separates forecast matches from email attempts and shows only the owner's records.
 - [ ] CSRF, rate limiting, secure cookies, and secrets handling are production-ready.
 - [x] Tests, lint, and build pass.
-- [ ] Migrations run cleanly on an empty database and on one with existing data.
+- [x] Migrations run cleanly on an empty database and on one with existing data. *(Fresh database tested in Docker; the local database has run every migration in order.)*
 - [ ] The deployment includes the API, frontend, database, always-on worker, logs, backups, and HTTPS.
 - [ ] The README covers setup, architecture, limitations, screenshots, and a demo.
 
 ---
 
-**Next:** Deploy.
+**Next:** Finish the Fly.io setup steps in the README, then verify the Resend domain and turn on production emails.

@@ -83,3 +83,52 @@ cd frontend && npm run lint && npm run build
 ```
 
 The backend tests use an in-memory database and never call Open-Meteo or Resend.
+
+## Deploying to Fly.io
+
+The production image ([Dockerfile](Dockerfile)) builds the React app and serves it from FastAPI, so the site and API share one origin. [fly.toml](fly.toml) runs two processes from that image:
+
+- **`app`**: the website and API, at `/` and `/api`. It sleeps when idle.
+- **`worker`**: always on, it checks every active alert every 30 minutes.
+
+Each deploy first runs `alembic upgrade head && python -m app.seed`.
+
+**First deploy**
+
+```bash
+brew install flyctl
+fly auth login
+
+# From the repo root. App names are global; if "surf-alerts" is taken,
+# pick another and update `app` in fly.toml.
+fly apps create surf-alerts
+
+# A PostgreSQL database. Either create one on Fly and attach it (this
+# sets DATABASE_URL), or use any Postgres provider:
+#   fly secrets set --stage DATABASE_URL="postgres://..."
+
+# Secrets. Use a new JWT secret for production, not the local one.
+fly secrets set --stage \
+  JWT_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')" \
+  RESEND_API_KEY="$(grep '^RESEND_API_KEY=' backend/.env | cut -d= -f2-)" \
+  EMAIL_FROM="Surf Alerts <onboarding@resend.dev>" \
+  EMAIL_NOTIFICATIONS_ENABLED=false
+
+fly deploy
+
+# One of each. Two web machines would split the in-memory rate limits,
+# and two workers would run every check twice.
+fly scale count app=1 worker=1
+
+fly open
+```
+
+**Every later deploy:** `fly deploy` from the repo root.
+
+**Turning on emails** once the Resend domain is verified:
+
+```bash
+fly secrets set EMAIL_FROM="Surf Alerts <alerts@surf-alerts.<my domain>>" EMAIL_NOTIFICATIONS_ENABLED=true
+```
+
+**Logs:** `fly logs` (add `--process-group worker` for just the worker).

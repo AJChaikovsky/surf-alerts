@@ -85,10 +85,42 @@ router = APIRouter(
 
 # -------- REQUEST AND RESPONSE SCHEMAS --------
 
+MIN_PASSWORD_LENGTH = 10
+
+# Length plus a blocklist, per NIST SP 800-63B, rather than
+# symbol/number rules. Only checked when registering.
+COMMON_PASSWORDS = {
+    "0123456789", "1234567890", "12345678910", "1111111111",
+    "1q2w3e4r5t", "abcdefghij", "iloveyou12", "password12",
+    "password123", "password1234", "passwordpassword", "qwerty1234",
+    "qwertyuiop", "qwertyuiop123", "surfalerts", "surfalerts1",
+}
+
+
+def password_problem(password: str, email: str) -> str | None:
+    """Return why a new password is too weak, or None if it's fine."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+
+    lowered = password.lower()
+
+    if lowered in COMMON_PASSWORDS or len(set(lowered)) == 1:
+        return "That password is too common. Please choose another."
+
+    username = email.split("@")[0].lower()
+
+    if len(username) >= 3 and username in lowered:
+        return "Password can't contain your email address."
+
+    return None
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
+    # Length rules are enforced by password_problem() so the
+    # user gets a readable message.
     password: str = Field(
-        min_length=8,
+        min_length=1,
         max_length=128
     )
 
@@ -391,6 +423,14 @@ def register(
     record_attempt(register_key)
 
     email = normalize_email(str(account.email))
+
+    problem = password_problem(account.password, email)
+
+    if problem:
+        raise HTTPException(
+            status_code=422,
+            detail=problem
+        )
 
     existing = db.scalar(
         select(User).where(User.email == email)

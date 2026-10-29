@@ -74,7 +74,7 @@ def make_user_client(db_session_factory):
 
         response = client.post(
             "/auth/register",
-            json={"email": email, "password": "password123"}
+            json={"email": email, "password": "salty-tube-ride-42"}
         )
 
         assert response.status_code == 201

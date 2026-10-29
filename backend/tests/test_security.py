@@ -105,7 +105,7 @@ def test_login_locks_after_repeated_failures(make_user_client):
     for _ in range(LOGIN_MAX_FAILURES):
         assert login(client, "locked@example.com", "wrong-pass").status_code == 401
 
-    response = login(client, "locked@example.com", "password123")
+    response = login(client, "locked@example.com", "salty-tube-ride-42")
 
     # Even the correct password is refused until the window passes.
     assert response.status_code == 429
@@ -119,7 +119,7 @@ def test_successful_login_resets_failure_count(make_user_client):
     for _ in range(LOGIN_MAX_FAILURES - 1):
         login(client, "reset@example.com", "wrong-pass")
 
-    assert login(client, "reset@example.com", "password123").status_code == 200
+    assert login(client, "reset@example.com", "salty-tube-ride-42").status_code == 200
 
     for _ in range(LOGIN_MAX_FAILURES - 1):
         assert login(client, "reset@example.com", "wrong-pass").status_code == 401
@@ -133,7 +133,7 @@ def test_lockout_is_per_account(make_user_client):
     for _ in range(LOGIN_MAX_FAILURES):
         login(client, "one@example.com", "wrong-pass")
 
-    assert login(client, "two@example.com", "password123").status_code == 200
+    assert login(client, "two@example.com", "salty-tube-ride-42").status_code == 200
 
 
 def test_registration_is_rate_limited(db_session_factory):
@@ -144,13 +144,13 @@ def test_registration_is_rate_limited(db_session_factory):
             "/auth/register",
             json={
                 "email": f"user{number}@example.com",
-                "password": "password123"
+                "password": "salty-tube-ride-42"
             }
         )
 
     response = client.post(
         "/auth/register",
-        json={"email": "one-more@example.com", "password": "password123"}
+        json={"email": "one-more@example.com", "password": "salty-tube-ride-42"}
     )
 
     assert response.status_code == 429
@@ -181,7 +181,7 @@ def test_logout_only_revokes_that_device(make_user_client):
     laptop = make_user_client("devices@example.com")
 
     phone = TestClient(app)
-    login(phone, "devices@example.com", "password123")
+    login(phone, "devices@example.com", "salty-tube-ride-42")
 
     phone.headers[CSRF_HEADER_NAME] = phone.cookies[CSRF_COOKIE_NAME]
     assert phone.post("/auth/logout").status_code == 200
@@ -249,5 +249,56 @@ def test_security_events_are_logged(make_user_client, caplog):
     assert any(m.startswith("logout user_id=") for m in messages)
 
     # Passwords and tokens never appear in the log.
-    assert not any("wrong-pass" in m or "password123" in m for m in messages)
+    assert not any("wrong-pass" in m or "salty-tube-ride-42" in m for m in messages)
     assert not any(token in m for m in messages)
+
+
+# -------- PASSWORD POLICY --------
+
+def register(client: TestClient, email: str, password: str):
+    return client.post(
+        "/auth/register",
+        json={"email": email, "password": password}
+    )
+
+
+def test_short_passwords_are_rejected(db_session_factory):
+    response = register(TestClient(app), "short@example.com", "nine-char")
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Password must be at least 10 characters."
+
+
+def test_common_passwords_are_rejected(db_session_factory):
+    client = TestClient(app)
+
+    for password in ("password123", "QWERTYUIOP", "aaaaaaaaaaaa"):
+        response = register(client, f"{len(password)}@example.com", password)
+
+        assert response.status_code == 422
+        assert "too common" in response.json()["detail"]
+
+
+def test_password_containing_the_email_is_rejected(db_session_factory):
+    response = register(TestClient(app), "kelly@example.com", "kelly-surfs-2026")
+
+    assert response.status_code == 422
+    assert "email" in response.json()["detail"]
+
+
+def test_long_unique_password_is_accepted(db_session_factory):
+    response = register(TestClient(app), "good@example.com", "offshore wind at dawn")
+
+    assert response.status_code == 201
+
+
+def test_existing_short_passwords_can_still_log_in(make_user_client, db_session_factory):
+    # The policy only applies to new passwords, not to logging in.
+    from app.auth import password_hash
+    from app.models import User
+
+    with db_session_factory() as db:
+        db.add(User(email="legacy@example.com", password_hash=password_hash.hash("eightchr")))
+        db.commit()
+
+    assert login(TestClient(app), "legacy@example.com", "eightchr").status_code == 200
