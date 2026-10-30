@@ -10,7 +10,7 @@ from app.auth import (
     reset_rate_limits,
 )
 from app.database import Base, get_db
-from app.main import app
+from app.main import app, reset_current_hour_cache
 from app.models import SurfSpot
 
 
@@ -18,8 +18,10 @@ from app.models import SurfSpot
 @pytest.fixture(autouse=True)
 def fresh_rate_limits():
     reset_rate_limits()
+    reset_current_hour_cache()
     yield
     reset_rate_limits()
+    reset_current_hour_cache()
 
 
 # -------- TEST DATABASE --------

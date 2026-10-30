@@ -29,7 +29,7 @@ This document describes what the app does, how it works, where it stands, and wh
 
 ### Resume here (October 29, 2026)
 
-Everything is committed and pushed to `main`. The backend tests (75), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
+Everything is committed and pushed to `main`. The backend tests (77), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
 
 **Live:** https://surf-alerts.fly.dev runs on Fly.io (one `app` machine and one `worker`) with a free Neon Postgres database in AWS US West. Deploy changes with `fly deploy` from the repo root; logs with `fly logs`. Fly needs a card on file: trial machines are stopped after 5 minutes, which stops the worker.
 
@@ -67,7 +67,7 @@ Forecast values are **modeled estimates**, not guarantees of breaking-wave heigh
 2. **Create an account:** An email and password. The password is hashed, and the session lives in an HTTP-only cookie.
 3. **Navigate:** A side menu (tabs at the top on narrow screens) links to **Surf Spots**, **Map**, **Local Breaks**, **My Alerts**, and **Alert History**. Each page has its own URL (`#/spots`, `#/map`, `#/breaks`, `#/alerts`, `#/history`), so refreshing and the back button keep your place.
 4. **Surf Spots:** 17 Southern California breaks, from Rincon to Ocean Beach, grouped by region (Ventura, Malibu, South Bay, Orange County, San Diego) from north to south. A search box filters by spot name or region. Picking a spot scrolls to the next 12 hours of wave height and period, swell height, period, and direction, and wind speed and direction, in local time with compass labels.
-5. **Map:** Every curated spot and your own local breaks on an OpenStreetMap map. Pins are blue for spots, purple for your local breaks, and green (and larger) where one of your active alerts matches the current forecast hour. Clicking a pin opens a box with the current wave height, swell period, and wind, which alerts match, and an **Add to alerts** button that opens My Alerts with that spot already selected.
+5. **Map:** Every curated spot and your own local breaks on an OpenStreetMap map. Pins are blue for spots, purple for your local breaks, and green (and larger) wherever the current forecast hour fits the conditions of one of your active alerts, at any break, not just the one the alert is set for. Clicking a pin opens a box with the current wave height, swell period, and wind, which alerts it fits (with "set for El Porto" when the alert belongs to a different break), and an **Add to alerts** button that opens My Alerts with that spot already selected.
 6. **Local Breaks:** A dedicated page for adding up to 3 breaks of your own, by name and coordinates (pasted straight from Google Maps). The app looks up wave data for the point before saving: if it finds some, it saves the break and shows the coming hour's waves, swell period, and wind; if not, it shows "Unable to retrieve data" and saves nothing. Local breaks are private: they appear only in your own Surf Spots list, under **My Local Breaks**, and in your alert options. A break an alert still uses can't be deleted.
 7. **My Alerts — create:** Name an alert, choose a break (the dropdown is grouped by region), and set minimum and maximum wave height, minimum swell period, and an optional maximum wind speed.
 8. **My Alerts — manage:** Edit thresholds, pause or reactivate, or delete with a confirmation step. A green circle means active; orange means paused.
@@ -438,7 +438,7 @@ A unique constraint on `(alert_id, surf_date)` allows only one email attempt per
 |---|---|---|---|
 | POST | `/alerts` | Session + CSRF | Create an alert owned by the current user, on a spot they can see |
 | GET | `/alerts` | Session | List the current user's alerts |
-| GET | `/alerts/current-matches` | Session | Spots where at least one of the user's active alerts matches the current forecast hour, with those alerts' names; a spot whose forecast fails is skipped |
+| GET | `/alerts/current-matches` | Session | Every spot the user can see whose current forecast hour fits at least one of their active alerts, wherever the alert is set, with each alert's name and home spot. Current hours are cached for 15 minutes and fetched at most 6 at a time; a spot whose forecast fails is skipped |
 | GET | `/alerts/{alert_id}/matches` | Owner | Check the latest forecast right now |
 | GET | `/alerts/{alert_id}/history` | Owner | The 20 most recent saved matches and 20 most recent email attempts |
 | PATCH | `/alerts/{alert_id}` | Owner + CSRF | Pause or reactivate |
@@ -565,7 +565,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 
 ## 11. Testing
 
-### Automated tests (75 passing)
+### Automated tests (77 passing)
 
 | File | Covers |
 |---|---|
@@ -577,7 +577,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 | `test_alert_history.py` | The owner sees history; other users get 404; login required |
 | `test_local_breaks.py` | Breaks are private (other users and anonymous visitors can't see, forecast, use, or delete them); 3-per-user limit; deleting frees a slot; land points rejected; can't delete a break an alert uses; curated spots can't be deleted; add attempts rate-limited |
 | `test_notification_email.py` | Email averages for waves, swell period, and wind; missing values skipped or shown as N/A; hour list truncation; HTML escaping |
-| `test_current_matches.py` | Only spots where an alert matches the current hour; only the matching alerts listed; paused and other users' alerts ignored; a failed forecast is skipped; login required |
+| `test_current_matches.py` | An alert turns every spot that fits green, not just its own; each spot lists every alert it fits with the alert's home spot; paused and other users' alerts ignored; own local breaks count, others' don't; failed forecasts skipped; current hours cached; login required |
 | `test_server.py` | Production entry point: frontend at `/`, assets, API under `/api`, login and CSRF through the prefix, JSON 404s |
 | `test_security.py` | Password policy: length, common passwords, email username, existing passwords still log in. CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected, expired tokens rejected. Security log: events recorded, no passwords or tokens |
 

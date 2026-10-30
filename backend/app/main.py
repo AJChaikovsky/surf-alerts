@@ -4,7 +4,7 @@ import logging
 import math
 import re
 import secrets
-from collections import defaultdict
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -456,11 +456,23 @@ def list_alerts(
     ).all()
 
 
-# -------- SPOTS WHERE MY ALERTS MATCH RIGHT NOW --------
-# Powers the map's "matching" color. Defined before the
+# -------- SPOTS THAT FIT MY ALERTS RIGHT NOW --------
+# Powers the map's green pins: every spot whose current hour fits any of
+# the user's active alerts, wherever that alert is set. Defined before the
 # /alerts/{alert_id} routes it sits alongside.
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
+
+# One spot's current hour, cached briefly: the map checks every spot on
+# each visit, and forecasts only change hourly.
+CURRENT_HOUR_CACHE_SECONDS = 15 * 60
+MAX_PARALLEL_FORECASTS = 6
+
+_current_hour_cache: dict[tuple[float, float], tuple[float, dict]] = {}
+
+
+def reset_current_hour_cache():
+    _current_hour_cache.clear()
 
 
 def current_pacific_hour() -> str:
@@ -469,6 +481,14 @@ def current_pacific_hour() -> str:
 
 
 async def current_forecast_hour(spot: SurfSpot) -> dict | None:
+    key = (spot.latitude, spot.longitude)
+    now = current_pacific_hour()
+    cached = _current_hour_cache.get(key)
+
+    # Reuse it while it's fresh and still the current hour.
+    if cached and cached[0] > time.monotonic() and cached[1]["time"] >= now:
+        return cached[1]
+
     try:
         forecast = format_forecast(
             await get_forecast(spot.latitude, spot.longitude)
@@ -478,12 +498,18 @@ async def current_forecast_hour(spot: SurfSpot) -> dict | None:
         # One spot's forecast failing shouldn't break the map.
         return None
 
-    now = current_pacific_hour()
-
-    return next(
+    hour = next(
         (hour for hour in forecast if hour["time"] >= now),
         None
     )
+
+    if hour is not None:
+        _current_hour_cache[key] = (
+            time.monotonic() + CURRENT_HOUR_CACHE_SECONDS,
+            hour
+        )
+
+    return hour
 
 
 @app.get("/alerts/current-matches")
@@ -491,45 +517,59 @@ async def current_alert_matches(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    rows = db.execute(
-        select(Alert, SurfSpot)
-        .join(SurfSpot, Alert.spot_id == SurfSpot.id)
-        .where(
+    alerts = db.scalars(
+        select(Alert).where(
             Alert.user_id == current_user.id,
             Alert.is_active.is_(True)
         )
     ).all()
 
-    # Fetch each spot's forecast once, all spots in parallel.
-    alerts_by_spot = defaultdict(list)
-    spots = {}
+    if not alerts:
+        return {"forecast_hour": current_pacific_hour(), "spots": []}
 
-    for alert, spot in rows:
-        alerts_by_spot[spot.id].append(alert)
-        spots[spot.id] = spot
+    # Every spot this user can see: curated spots plus their local breaks.
+    spots = db.scalars(
+        select(SurfSpot)
+        .where(spot_visible_to(current_user))
+        .order_by(SurfSpot.id)
+    ).all()
 
-    hours = await asyncio.gather(
-        *(current_forecast_hour(spot) for spot in spots.values())
-    )
+    spot_names = {spot.id: spot.name for spot in spots}
+
+    # Each spot's forecast once, a few at a time.
+    limit = asyncio.Semaphore(MAX_PARALLEL_FORECASTS)
+
+    async def hour_for(spot: SurfSpot):
+        async with limit:
+            return await current_forecast_hour(spot)
+
+    hours = await asyncio.gather(*(hour_for(spot) for spot in spots))
 
     matches = []
 
-    for spot, hour in zip(spots.values(), hours):
+    for spot, hour in zip(spots, hours):
         if hour is None:
             continue
 
-        matching_alerts = [
+        fitting = [
             alert
-            for alert in alerts_by_spot[spot.id]
+            for alert in alerts
             if find_matching_hours([hour], alert)
         ]
 
-        if matching_alerts:
+        if fitting:
             matches.append({
                 "spot_id": spot.id,
                 "alerts": [
-                    {"id": alert.id, "name": alert.name}
-                    for alert in matching_alerts
+                    {
+                        "id": alert.id,
+                        "name": alert.name,
+                        # Where the alert is set, so the map can say
+                        # "set for El Porto" when it fits elsewhere.
+                        "spot_id": alert.spot_id,
+                        "spot_name": spot_names.get(alert.spot_id),
+                    }
+                    for alert in fitting
                 ],
             })
 

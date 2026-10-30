@@ -26,9 +26,13 @@ type MapSpot = {
   is_custom: boolean;
 };
 
+// An alert whose conditions this spot fits right now. It may be set for
+// a different spot (spot_id / spot_name).
 type MatchingAlert = {
   id: number;
   name: string;
+  spot_id: number;
+  spot_name: string | null;
 };
 
 type CurrentMatches = {
@@ -40,9 +44,9 @@ type PopupForecast =
   | { status: "error" }
   | { status: "ready"; hour: ForecastHour | null };
 
-// Kept in sync with the legend in SpotMap.css.
+// Fallbacks only: SpotMap.css themes the pins with --pin-* variables.
 const COLORS = {
-  spot: "#0c7899",
+  spot: "#1d4ed8",
   local: "#7c3aed",
   matching: "#16a34a",
 };
@@ -97,9 +101,24 @@ function SpotPopup({
       </p>
 
       {matchingAlerts.length > 0 && (
-        <p className="map-popup-match">
-          Matches {matchingAlerts.map((alert) => alert.name).join(", ")}
-        </p>
+        <div className="map-popup-match">
+          <p className="map-popup-match-title">
+            {matchingAlerts.length === 1
+              ? "Fits your alert"
+              : `Fits ${matchingAlerts.length} of your alerts`}
+          </p>
+
+          <ul>
+            {matchingAlerts.map((alert) => (
+              <li key={alert.id}>
+                <strong>{alert.name}</strong>
+                {alert.spot_id !== spot.id && alert.spot_name && (
+                  <span> (set for {alert.spot_name})</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {(!forecast || forecast.status === "loading") && (
@@ -248,7 +267,7 @@ export default function SpotMap() {
       <PageHeader
         eyebrow="02 / Map"
         title="Surf map"
-        subtitle="Tap a spot for its current forecast. Green spots match one of your active alerts right now."
+        subtitle="Tap a spot for its current forecast. Green spots fit the conditions of one of your active alerts right now, wherever that alert is set."
       />
 
       {spotsError && (
@@ -268,14 +287,14 @@ export default function SpotMap() {
         </li>
         <li>
           <span className="map-legend-dot matching" aria-hidden="true" />
-          Matches an alert now
+          Fits one of your alerts now
         </li>
 
         <li className="map-legend-status" role="status">
           {matchesStatus === "loading" && "Checking your alerts..."}
           {matchesStatus === "error" && "Unable to check your alerts."}
           {matchesStatus === "ready" &&
-            `${matches.size} ${matches.size === 1 ? "spot matches" : "spots match"} right now`}
+            `${matches.size} ${matches.size === 1 ? "spot fits" : "spots fit"} your alerts right now`}
         </li>
       </ul>
 
