@@ -58,3 +58,8 @@ def test_unknown_api_route_is_a_json_404(client):
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not Found"}
+
+
+def test_missing_files_are_404_not_500(client):
+    assert client.get("/does-not-exist").status_code == 404
+    assert client.get("/assets/not-a-real-file.js").status_code == 404

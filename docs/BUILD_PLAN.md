@@ -29,7 +29,7 @@ This document describes what the app does, how it works, where it stands, and wh
 
 ### Resume here (October 29, 2026)
 
-Everything is committed and pushed to `main`. The backend tests (77), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
+Everything is committed and pushed to `main`. The backend tests (78), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
 
 **Live:** https://surf-alerts.fly.dev runs on Fly.io (one `app` machine and one `worker`) with a free Neon Postgres database in AWS US West. Deploy changes with `fly deploy` from the repo root; logs with `fly logs`. Fly needs a card on file: trial machines are stopped after 5 minutes, which stops the worker.
 
@@ -566,7 +566,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 
 ## 11. Testing
 
-### Automated tests (77 passing)
+### Automated tests (78 passing)
 
 | File | Covers |
 |---|---|
@@ -579,7 +579,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 | `test_local_breaks.py` | Breaks are private (other users and anonymous visitors can't see, forecast, use, or delete them); 3-per-user limit; deleting frees a slot; land points rejected; can't delete a break an alert uses; curated spots can't be deleted; add attempts rate-limited |
 | `test_notification_email.py` | Email averages for waves, swell period, and wind; missing values skipped or shown as N/A; hour list truncation; HTML escaping |
 | `test_current_matches.py` | An alert turns every spot that fits green, not just its own; each spot lists every alert it fits with the alert's home spot; paused and other users' alerts ignored; own local breaks count, others' don't; failed forecasts skipped; current hours cached; login required |
-| `test_server.py` | Production entry point: frontend at `/`, assets, API under `/api`, login and CSRF through the prefix, JSON 404s |
+| `test_server.py` | Production entry point: frontend at `/`, assets, API under `/api`, login and CSRF through the prefix, JSON 404s for unknown API routes, plain 404s (not 500s) for missing files |
 | `test_security.py` | Password policy: length, common passwords, email username, existing passwords still log in. CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected, expired tokens rejected. Security log: events recorded, no passwords or tokens |
 
 The tests run against an in-memory SQLite database, so PostgreSQL-specific behavior such as `ON CONFLICT` is verified by running the real worker.
