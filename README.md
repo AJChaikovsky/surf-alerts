@@ -1,5 +1,7 @@
 # Surf Alerts
 
+**Live site: [surf-alerts.fly.dev](https://surf-alerts.fly.dev)**
+
 Surf Alerts watches surf forecasts for me. I pick a break, describe the conditions I want (wave height, swell period, and wind), and it emails me when the forecast matches, at most once per alert per day.
 
 - 17 curated Southern California breaks, plus up to 3 private local breaks per user
