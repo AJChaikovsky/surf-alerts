@@ -31,21 +31,18 @@ This document describes what the app does, how it works, where it stands, and wh
 
 Everything is committed and pushed to `main`. The backend tests (74), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
 
-**Live:** https://surf-alerts.fly.dev runs on Fly.io (one `app` machine and one `worker`) with a free Neon Postgres database in AWS US West. Deploy changes with `fly deploy` from the repo root; logs with `fly logs`. Production emails are off until the Resend domain is verified.
+**Live:** https://surf-alerts.fly.dev runs on Fly.io (one `app` machine and one `worker`) with a free Neon Postgres database in AWS US West. Deploy changes with `fly deploy` from the repo root; logs with `fly logs`. Fly needs a card on file: trial machines are stopped after 5 minutes, which stops the worker.
 
-**Redesign:** committed to `main` (portfolio styling, light/dark, HyperFrames-style motion). Run `fly deploy` to put it on the live site if it isn't there yet.
+**Email is live:** production sends from `alerts@surf-alerts.ajchaikovsky.com`, a subdomain of my portfolio domain verified in Resend (DNS on Cloudflare). On October 30, 2026 a real alert matched and the email arrived at an address other than my Resend login.
 
-**In progress: verifying my email domain in Resend.** I'm adding Resend's DNS records at my domain provider:
-- TXT `resend._domainkey.surf-alerts`;
-- CNAME `rsend.surf-alerts`;
-- CNAME `send.surf-alerts`;
-- optionally, TXT `_dmarc`.
-
-Copy each value with Resend's copy button, and on Cloudflare set the CNAMEs to "DNS only". Once Resend says Verified, switch production to it with the `fly secrets set EMAIL_FROM=… EMAIL_NOTIFICATIONS_ENABLED=true` command in the README, and do one test send to an account that isn't my Resend login. Production starts with emails off, because until the domain is verified sends to other people fail, and a failed send blocks that alert for the day.
+**Still to do:**
+- Reset the Neon `neondb_owner` password (the old one was exposed) and update Fly's `DATABASE_URL` secret straight after.
+- Deploy the fix that stops the mouse wheel from changing number fields (committed, not yet deployed).
 
 **Things to remember:**
 
-- **Local `backend/.env` has `EMAIL_NOTIFICATIONS_ENABLED=true`**, so a local worker run sends real emails. Production's setting is separate (a Fly secret).
+- **Local `backend/.env` has `EMAIL_NOTIFICATIONS_ENABLED=true`**, so a local worker run sends real emails. Production's settings are separate Fly secrets (`EMAIL_FROM`, `EMAIL_NOTIFICATIONS_ENABLED`).
+- An alert whose matches span two Pacific days sends two emails, one per day; that's by design.
 - Production uses its own JWT secret, so local and production sessions are unrelated.
 - Keep production at one `app` and one `worker` machine. Rate limits are in memory, and a second worker would repeat every check.
 - A `failed` or `sent` delivery blocks more emails for that alert and surf day.
@@ -739,8 +736,8 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 
 - Host the frontend, API, PostgreSQL, and an always-on worker.
 - Configure secrets, migrations, HTTPS, routing, and the domain.
-- Confirm the worker runs without my laptop.
-- Verify a Resend sending domain so emails can go to any user.
+- ✅ Confirm the worker runs without my laptop.
+- ✅ Verify a Resend sending domain so emails can go to any user (`surf-alerts.ajchaikovsky.com`).
 - Set up backups, health checks, and logs.
 
 **Done when** someone on another device can sign up and get alerts while monitoring runs on its own.
