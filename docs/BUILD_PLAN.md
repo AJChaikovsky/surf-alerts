@@ -35,9 +35,7 @@ Everything is committed and pushed to `main`. The backend tests (74), lint, and 
 
 **Email is live:** production sends from `alerts@surf-alerts.ajchaikovsky.com`, a subdomain of my portfolio domain verified in Resend (DNS on Cloudflare). On October 30, 2026 a real alert matched and the email arrived at an address other than my Resend login.
 
-**Still to do:**
-- Reset the Neon `neondb_owner` password (the old one was exposed) and update Fly's `DATABASE_URL` secret straight after.
-- Deploy the fix that stops the mouse wheel from changing number fields (committed, not yet deployed).
+**Database credentials:** the Neon `neondb_owner` password was rotated on October 30, 2026 after the old one was exposed; production uses the new one via Fly's `DATABASE_URL` secret, and the old one is rejected. When rotating again, update the Fly secret immediately after resetting in Neon, since the site can't reach the database in between.
 
 **Things to remember:**
 
@@ -789,7 +787,7 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 - [x] Matches and daily emails are deduplicated.
 - [x] A real owner-addressed email was accepted, and the failure path works.
 - [x] History separates forecast matches from email attempts and shows only the owner's records.
-- [ ] CSRF, rate limiting, secure cookies, and secrets handling are production-ready.
+- [x] CSRF, rate limiting, secure cookies, and secrets handling are production-ready. *(Secure cookies over HTTPS on Fly; secrets in Fly, never in the repo or image; exposed database password rotated.)*
 - [x] Tests, lint, and build pass.
 - [x] Migrations run cleanly on an empty database and on one with existing data. *(Fresh database tested in Docker; the local database has run every migration in order.)*
 - [ ] The deployment includes the API, frontend, database, always-on worker, logs, backups, and HTTPS.
