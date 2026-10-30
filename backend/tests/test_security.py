@@ -223,6 +223,29 @@ def test_token_with_unknown_session_id_is_rejected(make_user_client):
     assert client_with_session(forged_token).get("/auth/me").status_code == 401
 
 
+def test_expired_session_token_is_rejected(make_user_client):
+    client = make_user_client("expired@example.com")
+    real_token = client.cookies[COOKIE_NAME]
+
+    # The same user and session id, so only the expiry date differs:
+    # a token from a session that's past its 7 days.
+    claims = jwt.decode(real_token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    expired_token = jwt.encode(
+        {**claims, "exp": datetime.now(timezone.utc) - timedelta(minutes=1)},
+        JWT_SECRET_KEY,
+        algorithm=JWT_ALGORITHM
+    )
+
+    expired = client_with_session(expired_token)
+
+    assert expired.get("/auth/me").status_code == 401
+    assert expired.get("/alerts").status_code == 401
+
+    # The original, unexpired token still works, so it's the expiry
+    # that's being rejected, not the session.
+    assert client.get("/auth/me").status_code == 200
+
+
 # -------- SECURITY LOG --------
 
 def test_security_events_are_logged(make_user_client, caplog):

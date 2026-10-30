@@ -29,7 +29,7 @@ This document describes what the app does, how it works, where it stands, and wh
 
 ### Resume here (October 29, 2026)
 
-Everything is committed and pushed to `main`. The backend tests (74), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
+Everything is committed and pushed to `main`. The backend tests (75), lint, and build all pass, and the production Docker image was tested locally against a fresh database: migrations, seed, website, API, login, alerts, and a worker check.
 
 **Live:** https://surf-alerts.fly.dev runs on Fly.io (one `app` machine and one `worker`) with a free Neon Postgres database in AWS US West. Deploy changes with `fly deploy` from the repo root; logs with `fly logs`. Fly needs a card on file: trial machines are stopped after 5 minutes, which stops the worker.
 
@@ -565,7 +565,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 
 ## 11. Testing
 
-### Automated tests (74 passing)
+### Automated tests (75 passing)
 
 | File | Covers |
 |---|---|
@@ -579,7 +579,7 @@ An alert without a wind limit still matches when wind data is missing; an alert 
 | `test_notification_email.py` | Email averages for waves, swell period, and wind; missing values skipped or shown as N/A; hour list truncation; HTML escaping |
 | `test_current_matches.py` | Only spots where an alert matches the current hour; only the matching alerts listed; paused and other users' alerts ignored; a failed forecast is skipped; login required |
 | `test_server.py` | Production entry point: frontend at `/`, assets, API under `/api`, login and CSRF through the prefix, JSON 404s |
-| `test_security.py` | Password policy: length, common passwords, email username, existing passwords still log in. CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected. Security log: events recorded, no passwords or tokens |
+| `test_security.py` | Password policy: length, common passwords, email username, existing passwords still log in. CSRF: missing, wrong, and other-session tokens rejected; reads exempt; cookie refresh. Rate limits: lockout, reset on success, per-account, registration. Sessions: logout revokes a copied token, other devices stay signed in, tokens without a valid session id rejected, expired tokens rejected. Security log: events recorded, no passwords or tokens |
 
 The tests run against an in-memory SQLite database, so PostgreSQL-specific behavior such as `ON CONFLICT` is verified by running the real worker.
 
@@ -779,7 +779,7 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 
 ## 17. Launch Checklist
 
-- [ ] New users can register, log in, and log out, and sessions expire correctly.
+- [x] New users can register, log in, and log out, and sessions expire correctly. *(October 30, 2026. Browser, on the live site: deleting or corrupting the `surf_session` cookie sends the app straight to the login page with no errors, and logging back in works. Server: `test_expired_session_token_is_rejected` confirms a session token past its expiry is refused while the same session's valid token still works.)*
 - [ ] Spots and forecasts load, with units and timezones documented.
 - [x] Creating, editing, pausing, and deleting alerts persists.
 - [x] No one can read or change another account's alerts or history, even with direct API calls.
