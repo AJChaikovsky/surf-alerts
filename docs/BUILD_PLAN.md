@@ -44,7 +44,6 @@ Everything is committed and pushed to `main`. The backend tests (77), lint, and 
 - Production uses its own JWT secret, so local and production sessions are unrelated.
 - Keep production at one `app` and one `worker` machine. Rate limits are in memory, and a second worker would repeat every check.
 - A `failed` or `sent` delivery blocks more emails for that alert and surf day.
-- The map uses OpenStreetMap's public tiles; switch to a tile provider if traffic grows.
 - Activate `backend/.venv` in every new terminal, and hard-refresh the browser after big frontend changes.
 
 ---
@@ -67,7 +66,7 @@ Forecast values are **modeled estimates**, not guarantees of breaking-wave heigh
 2. **Create an account:** An email and password. The password is hashed, and the session lives in an HTTP-only cookie.
 3. **Navigate:** A side menu (tabs at the top on narrow screens) links to **Surf Spots**, **Map**, **Local Breaks**, **My Alerts**, and **Alert History**. Each page has its own URL (`#/spots`, `#/map`, `#/breaks`, `#/alerts`, `#/history`), so refreshing and the back button keep your place.
 4. **Surf Spots:** 17 Southern California breaks, from Rincon to Ocean Beach, grouped by region (Ventura, Malibu, South Bay, Orange County, San Diego) from north to south. A search box filters by spot name or region. Picking a spot scrolls to the next 12 hours of wave height and period, swell height, period, and direction, and wind speed and direction, in local time with compass labels.
-5. **Map:** Every curated spot and your own local breaks on an OpenStreetMap map. Pins are blue for spots, purple for your local breaks, and green (and larger) wherever the current forecast hour fits the conditions of one of your active alerts, at any break, not just the one the alert is set for. Clicking a pin opens a box with the current wave height, swell period, and wind, which alerts it fits (with "set for El Porto" when the alert belongs to a different break), and an **Add to alerts** button that opens My Alerts with that spot already selected.
+5. **Map:** Every curated spot and your own local breaks on a smooth vector map (MapLibre with OpenFreeMap data, with real light and dark styles). Pins are blue for spots, purple for your local breaks, and green (and larger) wherever the current forecast hour fits the conditions of one of your active alerts, at any break, not just the one the alert is set for. Clicking a pin opens a box with the current wave height, swell period, and wind, which alerts it fits (with "set for El Porto" when the alert belongs to a different break), and an **Add to alerts** button that opens My Alerts with that spot already selected.
 6. **Local Breaks:** A dedicated page for adding up to 3 breaks of your own, by name and coordinates (pasted straight from Google Maps). The app looks up wave data for the point before saving: if it finds some, it saves the break and shows the coming hour's waves, swell period, and wind; if not, it shows "Unable to retrieve data" and saves nothing. Local breaks are private: they appear only in your own Surf Spots list, under **My Local Breaks**, and in your alert options. A break an alert still uses can't be deleted.
 7. **My Alerts — create:** Name an alert, choose a break (the dropdown is grouped by region), and set minimum and maximum wave height, minimum swell period, and an optional maximum wind speed.
 8. **My Alerts — manage:** Edit thresholds, pause or reactivate, or delete with a confirmation step. A green circle means active; orange means paused.
@@ -131,7 +130,7 @@ The design matches my portfolio, [ajchaikovsky.com](https://ajchaikovsky.com): w
 |---|---|---|
 | Frontend | React + TypeScript + Vite | Pages, login/register, alert forms, history |
 | Styling | Plain CSS | Responsive spot cards, forms, status indicators, side menu |
-| Map | Leaflet + react-leaflet, OpenStreetMap tiles | Interactive spot map |
+| Map | MapLibre GL + react-map-gl, OpenFreeMap vector tiles | Smooth WebGL spot map with real light and dark styles; free, no API key |
 | Motion | GSAP | Page, title, list, and pointer animations |
 | API | Python 3.12 + FastAPI | REST endpoints, validation, authentication, authorization |
 | Schemas | Pydantic v2 | Request/response validation |
@@ -284,7 +283,8 @@ surf-alerts/
             ├── AlertHistory.css
             ├── LocalBreaks.tsx     # Local Breaks page
             ├── LocalBreaks.css
-            ├── SpotMap.tsx         # Map page
+            ├── SpotMap.tsx         # Map page (MapLibre, lazy-loaded)
+            ├── LoadErrorBoundary.tsx  # Fallback if a lazy page fails to load
             └── SpotMap.css
 ```
 
@@ -294,7 +294,8 @@ surf-alerts/
 - **`Dashboard.tsx`** loads spots and the user's alerts and renders either the Surf Spots page or the My Alerts page. Switching between the two keeps the selected spot and any half-filled form.
 - **`AlertHistory.tsx`** loads one alert's saved matches and delivery records.
 - **`LocalBreaks.tsx`** adds, lists, and deletes the user's own breaks.
-- **`SpotMap.tsx`** draws the map, colors pins using `/alerts/current-matches`, and loads a spot's current forecast when its pin is clicked.
+- **`SpotMap.tsx`** draws the MapLibre map (loaded only when the Map page opens), colors pins using `/alerts/current-matches`, and loads a spot's current forecast when its pin is clicked. Pins are HTML markers, so recoloring never closes an open popup.
+- **`LoadErrorBoundary.tsx`** shows a "refresh the page" message if a lazily loaded page (the map) fails to download, for example in a tab left open across a deploy.
 - **`AuthPage.tsx`** handles login and registration, with errors shown next to the form.
 - **`ForecastCard.tsx`** displays one forecast hour with units and compass directions.
 - **`api.ts`** provides `apiFetch`, which every signed-in page uses: it adds the `X-CSRF-Token` header to state-changing requests, and on a 401 it tells `App` to show the login page, so a tab whose session ended (for example, logged out in another tab) returns to login on its next request.
@@ -758,7 +759,7 @@ Run them with `"$(brew --prefix postgresql@17)/bin/psql" -d surf_alerts`.
 6. **Forecast accuracy:** modeled offshore wave height isn't the same as breaking-wave height at a beach. Surf-quality scores would need coastline and bathymetry data.
 7. **Sessions:** cookies, CSRF, and server-side revocation are in place; session renewal isn't yet.
 8. **Ownership:** every new alert-related route has to check ownership the same way.
-9. **Map tiles:** the map uses OpenStreetMap's public tile server, which is fine for development and light use. A public launch with real traffic should switch to a tile provider with a free tier (OSM's usage policy asks heavy users not to rely on its servers).
+9. **Map data:** the map draws OpenFreeMap's free vector tiles with MapLibre. OpenFreeMap needs no key and is meant for production use; if it ever became a problem, MapLibre can point at another vector tile provider by changing the style URL.
 10. **Frontend structure:** `Dashboard.tsx` could be split into smaller components, and `api.ts` grown into a typed API client.
 11. **Honest labels:** emails are shown as pending, accepted, or failed, never "delivered."
 

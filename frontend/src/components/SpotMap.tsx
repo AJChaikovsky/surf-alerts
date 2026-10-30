@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import {
-  CircleMarker,
-  MapContainer,
+import { useCallback, useEffect, useRef, useState } from "react";
+import MapGL, {
+  Marker,
+  NavigationControl,
   Popup,
-  TileLayer,
-  useMap,
-} from "react-leaflet";
-import { latLngBounds } from "leaflet";
-import "leaflet/dist/leaflet.css";
+  type MapRef,
+} from "react-map-gl/maplibre";
+import * as maplibregl from "maplibre-gl";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 import { apiFetch } from "../api";
 import { PageHeader } from "./Motion";
@@ -44,15 +44,58 @@ type PopupForecast =
   | { status: "error" }
   | { status: "ready"; hour: ForecastHour | null };
 
-// Fallbacks only: SpotMap.css themes the pins with --pin-* variables.
-const COLORS = {
-  spot: "#1d4ed8",
-  local: "#7c3aed",
-  matching: "#16a34a",
+// MapLibre finds its tile-decoding worker relative to its own file, which
+// breaks once Vite bundles it. Ship the worker explicitly and point at it,
+// and hand this same instance to the map (mapLib below); react-map-gl would
+// otherwise load a separate copy that never gets the worker URL.
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
+
+// OpenFreeMap: free vector map styles, no API key. A real dark style,
+// so dark mode isn't an inverted image.
+const MAP_STYLES = {
+  light: "https://tiles.openfreemap.org/styles/positron",
+  dark: "https://tiles.openfreemap.org/styles/dark",
 };
 
 // Southern California, before the spots load.
-const DEFAULT_CENTER: [number, number] = [33.6, -118.1];
+const INITIAL_VIEW = { longitude: -118.1, latitude: 33.6, zoom: 7 };
+
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+
+// "light" or "dark", following the theme toggle and the system setting.
+function useResolvedTheme(): "light" | "dark" {
+  const resolve = () => {
+    const chosen = document.documentElement.dataset.theme;
+
+    if (chosen === "light" || chosen === "dark") return chosen;
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  };
+
+  const [theme, setTheme] = useState<"light" | "dark">(resolve);
+
+  useEffect(() => {
+    const update = () => setTheme(resolve());
+    const observer = new MutationObserver(update);
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    query.addEventListener("change", update);
+
+    return () => {
+      observer.disconnect();
+      query.removeEventListener("change", update);
+    };
+  }, []);
+
+  return theme;
+}
 
 
 function formatMeasurement(value: number | null, unit: string): string {
@@ -64,23 +107,6 @@ function formatHour(time: string): string {
   const suffix = hour < 12 ? "AM" : "PM";
 
   return `${hour % 12 === 0 ? 12 : hour % 12} ${suffix}`;
-}
-
-
-// Zoom the map to fit every spot once they load.
-function FitToSpots({ spots }: { spots: MapSpot[] }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (spots.length > 0) {
-      map.fitBounds(
-        latLngBounds(spots.map((spot) => [spot.latitude, spot.longitude])),
-        { padding: [40, 40] }
-      );
-    }
-  }, [map, spots]);
-
-  return null;
 }
 
 
@@ -184,6 +210,32 @@ export default function SpotMap() {
     {}
   );
 
+  const [selected, setSelected] = useState<MapSpot | null>(null);
+  const mapRef = useRef<MapRef | null>(null);
+  const theme = useResolvedTheme();
+
+  // Frame every spot once both the map and the spots are ready.
+  const fitToSpots = useCallback(() => {
+    const map = mapRef.current;
+
+    if (!map || spots.length === 0) return;
+
+    const lngs = spots.map((spot) => spot.longitude);
+    const lats = spots.map((spot) => spot.latitude);
+
+    map.fitBounds(
+      [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)],
+      ],
+      { padding: 48, maxZoom: 11, duration: reduceMotion ? 0 : 800 }
+    );
+  }, [spots]);
+
+  useEffect(() => {
+    fitToSpots();
+  }, [fitToSpots]);
+
 
   // Spots first so the map draws quickly; matching checks every
   // alert's forecast, so it loads separately.
@@ -225,6 +277,11 @@ export default function SpotMap() {
     void loadMatches();
   }, []);
 
+
+  function openSpot(spot: MapSpot) {
+    setSelected(spot);
+    void loadForecast(spot);
+  }
 
   async function loadForecast(spot: MapSpot) {
     if (forecasts[spot.slug]?.status === "ready") {
@@ -299,60 +356,72 @@ export default function SpotMap() {
       </ul>
 
       <div className="map-frame">
-        <MapContainer
-          center={DEFAULT_CENTER}
-          zoom={8}
-          scrollWheelZoom
-          className="map-canvas"
+        <MapGL
+          mapLib={maplibregl}
+          ref={mapRef}
+          initialViewState={INITIAL_VIEW}
+          mapStyle={MAP_STYLES[theme]}
+          style={{ width: "100%", height: "100%" }}
+          onLoad={fitToSpots}
+          dragRotate={false}
+          touchPitch={false}
+          cooperativeGestures={false}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          <FitToSpots spots={spots} />
+          <NavigationControl position="top-left" showCompass={false} />
 
           {spots.map((spot) => {
             const matchingAlerts = matches.get(spot.id) ?? [];
-            const isMatching = matchingAlerts.length > 0;
-
-            const color = isMatching
-              ? COLORS.matching
-              : spot.is_custom
-                ? COLORS.local
-                : COLORS.spot;
+            const kind =
+              matchingAlerts.length > 0
+                ? "match"
+                : spot.is_custom
+                  ? "local"
+                  : "spot";
 
             return (
-              <CircleMarker
-                // Remount when the color changes so Leaflet restyles it.
-                key={`${spot.id}-${color}`}
-                center={[spot.latitude, spot.longitude]}
-                radius={isMatching ? 11 : 8}
-                pathOptions={{
-                  color: "white",
-                  weight: 2,
-                  fillColor: color,
-                  fillOpacity: 0.95,
-                  // Themed colours from SpotMap.css; fillColor is the fallback.
-                  className: isMatching
-                    ? "pin pin-match"
-                    : spot.is_custom
-                      ? "pin pin-local"
-                      : "pin pin-spot",
+              // HTML pins: a colour change only swaps a class, so an open
+              // popup is never torn down when the alert check finishes.
+              <Marker
+                key={spot.id}
+                longitude={spot.longitude}
+                latitude={spot.latitude}
+                anchor="center"
+                onClick={(event) => {
+                  // Keep the map's own click from closing the new popup.
+                  event.originalEvent.stopPropagation();
+                  openSpot(spot);
                 }}
-                eventHandlers={{ click: () => void loadForecast(spot) }}
               >
-                <Popup>
-                  <SpotPopup
-                    spot={spot}
-                    forecast={forecasts[spot.slug]}
-                    matchingAlerts={matchingAlerts}
-                  />
-                </Popup>
-              </CircleMarker>
+                <button
+                  type="button"
+                  className={`map-pin ${kind}`}
+                  aria-label={
+                    kind === "match"
+                      ? `${spot.name}, fits your alerts`
+                      : spot.name
+                  }
+                />
+              </Marker>
             );
           })}
-        </MapContainer>
+
+          {selected && (
+            <Popup
+              longitude={selected.longitude}
+              latitude={selected.latitude}
+              anchor="bottom"
+              offset={16}
+              maxWidth="320px"
+              onClose={() => setSelected(null)}
+            >
+              <SpotPopup
+                spot={selected}
+                forecast={forecasts[selected.slug]}
+                matchingAlerts={matches.get(selected.id) ?? []}
+              />
+            </Popup>
+          )}
+        </MapGL>
       </div>
     </main>
   );

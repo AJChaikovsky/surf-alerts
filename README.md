@@ -9,7 +9,7 @@ Surf Alerts watches surf forecasts for me. I pick a break, describe the conditio
 - A background worker that checks every active alert every 30 minutes
 - Per-account alerts and history, with cookie sessions, CSRF protection, rate limiting, and server-side logout
 
-**Stack:** React + TypeScript + Vite · FastAPI · PostgreSQL · SQLAlchemy + Alembic · APScheduler · Open-Meteo · Resend · Leaflet
+**Stack:** React + TypeScript + Vite · FastAPI · PostgreSQL · SQLAlchemy + Alembic · APScheduler · Open-Meteo · Resend · MapLibre + OpenFreeMap
 
 The full specification, status, and roadmap are in [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md).
 

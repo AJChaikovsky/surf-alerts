@@ -17,15 +17,17 @@ const finePointer =
 
 
 // "Blur swap on one stage": the new page sharpens in; the ground never cuts.
-export function blurSwapIn(element: HTMLElement | null) {
+// Pages with a WebGL map fade only: a CSS blur over the map makes it repaint
+// while it's loading.
+export function blurSwapIn(element: HTMLElement | null, blur = true) {
   if (!animate || !element) return;
 
   gsap.fromTo(
     element,
-    { opacity: 0, filter: "blur(8px)" },
+    { opacity: 0, filter: blur ? "blur(8px)" : "none" },
     {
       opacity: 1,
-      filter: "blur(0px)",
+      filter: blur ? "blur(0px)" : "none",
       duration: 0.22,
       ease: "power2.out",
       clearProps: "filter,opacity",

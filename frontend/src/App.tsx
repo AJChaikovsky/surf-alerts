@@ -1,14 +1,24 @@
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import Dashboard from "./Dashboard";
 import AlertHistory from "./components/AlertHistory";
 import LocalBreaks from "./components/LocalBreaks";
-import SpotMap from "./components/SpotMap";
 import SideNav, { type Page } from "./components/SideNav";
+import LoadErrorBoundary from "./components/LoadErrorBoundary";
 import ThemeToggle from "./components/ThemeToggle";
 import { apiFetch, SESSION_EXPIRED_EVENT } from "./api";
 import { blurSwapIn, installPointerEffects } from "./motion";
+
+// The map library is large, so it downloads only when the Map page opens.
+const SpotMap = lazy(() => import("./components/SpotMap"));
 
 import AuthPage, {
   type AuthenticatedUser,
@@ -107,7 +117,7 @@ function App() {
   // menu stay put.
 
   useLayoutEffect(() => {
-    blurSwapIn(contentRef.current);
+    blurSwapIn(contentRef.current, page !== "map");
   }, [page, authStatus]);
 
   // -------- FOLLOW SIDE MENU LINKS --------
@@ -293,7 +303,17 @@ function App() {
           ) : page === "breaks" ? (
             <LocalBreaks />
           ) : page === "map" ? (
-            <SpotMap />
+            <LoadErrorBoundary what="the map">
+              <Suspense
+                fallback={
+                  <main className="dashboard">
+                    <p className="page-subtitle">Loading map...</p>
+                  </main>
+                }
+              >
+                <SpotMap />
+              </Suspense>
+            </LoadErrorBoundary>
           ) : (
             <Dashboard view={page} />
           )}
